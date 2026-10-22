@@ -39,7 +39,9 @@ function saveSession(s) { session = s; try { s ? localStorage.setItem(SKEY, JSON
 export function restore() {
   try {
     const s = JSON.parse(localStorage.getItem(SKEY) || 'null');
-    if (s && new Date(s.exp) > new Date()) { saveSession(s); return s; }
+    // โหมด server: session จากบัญชีในเครื่อง (ไม่มี token และไม่ใช่ login ตอน offline) ใช้ซิงก์ไม่ได้ → ให้เข้าสู่ระบบใหม่
+    const stale = s && isServerMode() && !s.token && !s.offline;
+    if (s && !stale && new Date(s.exp) > new Date()) { saveSession(s); return s; }
   } catch {}
   saveSession(null); return null;
 }

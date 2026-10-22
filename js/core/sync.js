@@ -42,6 +42,15 @@ export async function run() {
   if (!navigator.onLine) { state.online = false; emit(); return; }
   state.syncing = true; state.error = ''; emit();
   try {
+    // เครื่องที่ยังไม่เคยซิงก์ (เพิ่งเชื่อม Google): ดึงข้อมูลจาก server ก่อน และให้ข้อมูล server ชนะของในเครื่อง
+    // กันข้อมูลตั้งต้นของเครื่องใหม่ (ห้อง/ที่จอดจาก seed) ทับข้อมูลจริงบน server
+    if (!await db.meta('lastSync')) {
+      const r = await api.call('sync', { changes: [], since: '' });
+      const fromServer = new Set((r.changes || []).map(c => c.col + '|' + c.rec.id));
+      for (const e of (await db.outbox()).filter(e => e.kind === 'put' && fromServer.has(e.col + '|' + e.id))) await db.unqueue(e.seq);
+      await applyIncoming(r.changes || [], { serverWins: true });
+      if (r.serverTime) await db.meta('lastSync', r.serverTime);
+    }
     const entries = (await db.outbox()).sort((a, b) => a.seq - b.seq);
 
     // 1) รูปบัตรประชาชน → Google Drive
@@ -94,13 +103,13 @@ export async function run() {
   if (!state.error && state.pending && await autoUpload()) setTimeout(run, 1500);
 }
 
-async function applyIncoming(list) {
+async function applyIncoming(list, { serverWins = false } = {}) {
   const pending = new Set((await db.outbox()).filter(e => e.kind === 'put').map(e => e.col + '|' + e.id));
   const byCol = {};
   for (const { col, rec } of list) {
     if (!db.SYNC_COLS.includes(col) || pending.has(col + '|' + rec.id)) continue;   // ของในเครื่องที่ยังไม่อัปโหลดชนะ
     const local = db.all(col, { withDeleted: true }).find(o => o.id === String(rec.id));
-    if (local && local.updatedAt >= rec.updatedAt) continue;
+    if (!serverWins && local && local.updatedAt >= rec.updatedAt) continue;
     (byCol[col] = byCol[col] || []).push(rec);
   }
   for (const col in byCol) await db.putMany(col, byCol[col]);
