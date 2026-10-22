@@ -75,7 +75,7 @@ const round = n => Math.round(n * 100) / 100;
 export function billLines(b, lang = langOf(b)) {
   const c = calcBill(b), en = lang === 'en', L = [];
   const m = b.period.split('-');
-  if (b.rent) L.push({ label: en ? 'Room Rental' : 'ค่าเช่าห้อง', sub: `${m[1]}/${m[0]}`, amount: b.rent });
+  if (b.rent) L.push({ label: en ? 'Room Rental' : 'ค่าเช่าห้อง', sub: `${m[1]}/${en ? m[0] : +m[0] + 543}`, amount: b.rent });   // ไทยใช้ปี พ.ศ.
   const minTxt = en ? ' min.' : ' ขั้นต่ำ';
   if (c.eu != null) L.push({ label: en ? 'Electricity' : 'ค่าไฟฟ้า', sub: `( ${b.ePrev} - ${b.eCur} )${c.eMin ? minTxt : ''}`, qty: c.eMin ? c.eBilled : c.eu, price: b.eRate, amount: c.elec });
   if (c.wu != null) L.push({ label: en ? 'Water' : 'ค่าน้ำประปา', sub: `( ${b.wPrev} - ${b.wCur} )${c.wMin ? minTxt : ''}`, qty: c.wMin ? c.wBilled : c.wu, price: b.wRate, amount: c.water });
