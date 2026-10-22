@@ -23,32 +23,39 @@ const T = {
     price: 'Price/Unit', amount: 'Amount', total: 'Total', paid: 'Paid', balance: 'Balance', tenant: 'TENANT', preparer: 'PREPARER', receiver: 'RECEIVER', due: 'Due date' },
 };
 
-// จัดหน้าด้วยตาราง (ไม่ใช้ flex/grid) เพื่อให้ตัวแปลง HTML→PDF ของ Google วางตำแหน่งได้เหมือนตอนพิมพ์
+// ขนาดตามกระดาษ A4 (794×1123 px ที่ 96 dpi, ขอบ 15 มม.) — เส้นน้ำเงินล่างอยู่ชิดขอบล่างของหน้าเสมอ
 const CSS = `
-.doc{font-family:"IBM Plex Sans Thai","Sarabun","TH Sarabun New",sans-serif;color:#111;max-width:740px;margin:0 auto;font-size:15px;line-height:1.45}
+.doc{font-family:"IBM Plex Sans Thai","Sarabun","TH Sarabun New",sans-serif;color:#111;max-width:680px;margin:0 auto;font-size:15px;line-height:1.45}
 .doc table.lay{width:100%;border-collapse:collapse}
 .doc table.lay td{padding:0;vertical-align:top;border:0}
-.doc .logo{width:180px}.doc .brand{font-weight:700;color:#1b2a6b;font-size:20px}
-.doc .title{border:1.5px solid #111;border-radius:18px;padding:14px 10px;font-size:22px;font-weight:700;color:#c00;text-align:center}
-.doc .no{text-align:center;font-weight:700;margin-top:22px}
-.doc .rule{border-top:3px solid #1b2a6b;margin:6px 0 18px}
-.doc table.info{border-collapse:collapse;margin:0 0 16px 30px}
-.doc table.info td{padding:7px 0;border:0;vertical-align:top}
-.doc table.info td.k{width:200px}
+.doc .logo{width:160px}.doc .brand{font-weight:700;color:#1b2a6b;font-size:20px}
+.doc .title{border:1.5px solid #111;border-radius:18px;padding:12px 10px;font-size:22px;font-weight:700;color:#c00;text-align:center}
+.doc .no{text-align:center;font-weight:700;margin-top:18px}
+.doc .rule{border-top:3px solid #1b2a6b;margin:8px 0 18px}
+.doc table.info{border-collapse:collapse;margin:0 0 18px 26px}
+.doc table.info td{padding:6px 0;border:0;vertical-align:top}
+.doc table.info td.k{width:190px}
 .doc table.items{width:100%;border-collapse:separate;border-spacing:0;border:1.5px solid #111;border-radius:12px}
-.doc table.items th{font-weight:700;border-bottom:1px solid #111;border-left:1px solid #111;padding:14px 8px;text-align:center}
+.doc table.items th{font-weight:700;border-bottom:1px solid #111;border-left:1px solid #111;padding:13px 6px;text-align:center;white-space:nowrap}
 .doc table.items td{border-left:1px solid #111;padding:7px 14px;vertical-align:top}
 .doc table.items th.f,.doc table.items td.f{border-left:0}
+.doc table.items td.f{white-space:nowrap}
 .doc table.items td.n{text-align:right;white-space:nowrap}.doc table.items td.c{text-align:center}
-.doc table.items tr.sp td{height:12px;padding:0 14px}
-.doc table.items tr.tot td{border-top:1px solid #111;font-weight:700;padding:12px 14px}
-.doc .note{margin:40px 0 18px;font-size:15px;color:#111}
-.doc table.sign{width:100%;border-collapse:collapse;margin-top:36px}
-.doc table.sign td{width:50%;text-align:center;vertical-align:bottom;padding:0;border:0}
-.doc .sig{display:block;height:84px;margin:0 0 -40px 120px}
-.doc .qr{text-align:center;margin-top:34px}.doc .qr img{width:360px}
-.doc .stamp{color:#2e8b57;font-weight:700;font-size:16px;margin:30px 0 10px}
-.doc .foot{border-top:3px solid #1b2a6b;margin-top:60px}
+.doc table.items tr.sp td{height:10px;padding:0 14px}
+.doc table.items tr.tot td{border-top:1px solid #111;font-weight:700;padding:12px 14px;white-space:normal}
+.doc .note{margin:34px 0 6px;font-size:15px;color:#111}
+.doc table.sign{border-collapse:collapse;margin:16px auto 0;width:94%}
+.doc table.sign td{padding:0;border:0;vertical-align:bottom}
+.doc table.sign td.lbl{white-space:nowrap;width:1%}
+.doc table.sign td.dots{text-align:center;width:45%}
+.doc table.sign td.gap{width:9%}
+.doc table.sign tr.img td{height:56px;text-align:center}
+.doc .sig{height:80px;position:relative;top:30px;z-index:1}   /* เลื่อนลงให้ปลายลายเซ็นทับเส้นประ (ไม่ลอย) */
+.doc .qr{text-align:center;margin-top:24px}.doc .qr img{width:330px}
+.doc .stamp{color:#2e8b57;font-weight:700;font-size:16px;margin:30px 0 6px}
+.doc .foot{border-top:3px solid #1b2a6b;margin-top:26px}
+.a4{width:794px;height:1123px;padding:52px 57px;box-sizing:border-box;background:#fff}
+.a4 .doc{height:100%;display:flex;flex-direction:column}.a4 .doc .foot{margin-top:auto}
 @media print{.page .doc{min-height:272mm;display:flex;flex-direction:column}.page .doc .foot{margin-top:auto}}
 `;
 export const docCss = () => CSS;
@@ -60,12 +67,12 @@ export async function docHtml(b, { type = 'invoice', lang = M.langOf(b), payment
   const now = new Date();
   const amount = type === 'receipt' && payment ? payment.amount : c.total;
   const no = type === 'receipt' ? (payment?.receiptNo || b.receiptNo || '-') : (b.invoiceNo || '-');
-  const dots = '.'.repeat(52);
+  const dots = '.'.repeat(44);
   return `<div class="doc">
   <table class="lay"><tr>
     <td>${logo ? `<img class="logo" src="${logo}" alt="">` : `<div class="brand">${esc(p.nameEn || p.name)}</div>`}
       ${p.address || p.phone || p.taxId ? `<div style="font-size:12px">${esc(p.address || '')}${p.phone ? ' โทร ' + esc(p.phone) : ''}${p.taxId ? '<br>เลขประจำตัวผู้เสียภาษี ' + esc(p.taxId) : ''}</div>` : ''}</td>
-    <td style="width:330px;padding-top:12px"><div class="title">${type === 'receipt' ? t.receipt : t.invoice}</div><div class="no">NO. ${esc(no)}</div></td>
+    <td style="width:290px;padding-top:8px"><div class="title">${type === 'receipt' ? t.receipt : t.invoice}</div><div class="no">NO. ${esc(no)}</div></td>
   </tr></table>
   <div class="rule"></div>
   <table class="info">
@@ -73,26 +80,57 @@ export async function docHtml(b, { type = 'invoice', lang = M.langOf(b), payment
     <tr><td class="k">${t.name} :</td><td>${esc(b.tenantName || '')}</td></tr>
     <tr><td class="k">${t.date} :</td><td>${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}<span style="display:inline-block;width:80px"></span>${now.toTimeString().slice(0, 8)}</td></tr>
   </table>
-  <table class="items"><thead><tr><th class="f">${t.item}</th><th style="width:150px">${t.qty}</th><th style="width:130px">${t.price}</th><th style="width:150px">${t.amount}</th></tr></thead><tbody>
+  <table class="items"><thead><tr><th class="f">${t.item}</th><th style="width:105px">${t.qty}</th><th style="width:110px">${t.price}</th><th style="width:120px">${t.amount}</th></tr></thead><tbody>
     <tr class="sp"><td class="f"></td><td></td><td></td><td></td></tr>
-    ${lines.map(l => `<tr><td class="f"><span style="display:inline-block;min-width:150px">${esc(l.label)}</span>${esc(l.sub || '')}</td><td class="c">${l.qty ?? ''}</td><td class="n">${l.price != null ? fmt2(l.price) : ''}</td><td class="n">${fmt2(l.amount)}</td></tr>`).join('')}
+    ${lines.map(l => `<tr><td class="f"><span style="display:inline-block;min-width:110px">${esc(l.label)}</span>${esc(l.sub || '')}</td><td class="c">${l.qty ?? ''}</td><td class="n">${l.price != null ? fmt2(l.price) : ''}</td><td class="n">${fmt2(l.amount)}</td></tr>`).join('')}
     <tr class="sp"><td class="f"></td><td></td><td></td><td></td></tr>
     ${type === 'receipt' && c.paid !== c.total ? `<tr class="tot"><td class="f" style="text-align:center" colspan="2"></td><td class="c">${t.total}</td><td class="n">${fmt2(c.total)}</td></tr>` : ''}
     <tr class="tot"><td class="f" style="text-align:center" colspan="2">( ${lang === 'en' ? englishAmount(amount) : bahtText(amount)} )</td><td class="c">${type === 'receipt' ? t.paid : t.total}</td><td class="n">${fmt2(amount)}</td></tr>
   </tbody></table>
   ${type === 'receipt' ? `<p class="stamp">✔ ${t.paid} ${thDate(payment?.date || b.paidAt)}${c.balance > 0 ? ` · ${t.balance} ${fmt2(c.balance)}` : ''}</p>`
     : `<p class="note">${esc(lang === 'en' ? (p.billNoteEn || p.billNote || '') : (p.billNote || ''))}</p>`}
-  <table class="sign"><tr>
-    <td>${t.tenant}${dots}</td>
-    <td>${type === 'invoice' && sign ? `<img class="sig" src="${sign}" alt="">` : ''}${type === 'receipt' ? t.receiver : t.preparer}${dots}</td>
-  </tr></table>
+  <table class="sign">
+    <tr class="img"><td class="lbl"></td><td class="dots"></td><td class="gap"></td><td class="lbl"></td>
+      <td class="dots">${type === 'invoice' && sign ? `<img class="sig" src="${sign}" alt="">` : ''}</td></tr>
+    <tr><td class="lbl">${t.tenant}</td><td class="dots">${dots}</td><td class="gap"></td>
+      <td class="lbl">${type === 'receipt' ? t.receiver : t.preparer}</td><td class="dots">${dots}</td></tr>
+  </table>
   ${type === 'invoice' && qr && p.showQr !== false ? `<div class="qr"><img src="${qr}" alt="QR ชำระเงิน"></div>` : ''}
   <div class="foot"></div>
 </div>`;
 }
 const fmt2 = n => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// เอกสารครบหน้า (ใช้ทำ PDF ที่ server)
+// PDF ขนาด A4 จริง วาดในเครื่องจากหน้าตาเดียวกับที่พิมพ์ (html2canvas + jsPDF) → ส่งให้ server เก็บใน Drive และแนบลิงก์ใน LINE
+// ตัวแปลง HTML→PDF ของ Google กำหนดขนาดกระดาษไม่ได้ จึงทำ PDF เองเพื่อให้ได้ A4 ตรงกับใบที่พิมพ์
+const LIBS = {
+  html2canvas: 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
+  jspdf: 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+};
+const loaded = {};
+const loadLib = key => loaded[key] ||= new Promise((res, rej) => {
+  const s = document.createElement('script'); s.src = LIBS[key]; s.onload = res; s.onerror = () => { delete loaded[key]; rej(new Error('โหลดตัวสร้าง PDF ไม่ได้')); };
+  document.head.appendChild(s);
+});
+export async function docPdf(b, opts) {
+  await Promise.all([loadLib('html2canvas'), loadLib('jspdf')]);
+  await document.fonts?.ready;
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-10000px;top:0;z-index:-1';
+  host.innerHTML = `<style>${CSS}</style><div class="a4">${await docHtml(b, opts)}</div>`;
+  document.body.appendChild(host);
+  try {
+    // รอรูป (dataURL) โหลดเสร็จ — ไม่ใช้ img.decode() เพราะค้างได้เมื่อรูปอยู่นอกจอ
+    await Promise.all([...host.querySelectorAll('img')].map(i => i.complete ? null
+      : new Promise(r => { i.onload = i.onerror = r; setTimeout(r, 3000); })));
+    const canvas = await window.html2canvas(host.querySelector('.a4'), { scale: 2, backgroundColor: '#ffffff', logging: false });
+    const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297);
+    return pdf.output('datauristring');
+  } finally { host.remove(); }
+}
+
+// เอกสารครบหน้า (ใช้ทำ PDF ที่ server — สำรองกรณีสร้าง PDF ในเครื่องไม่ได้)
 export async function docPage(b, opts) {
   return `<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{margin:0}${CSS}</style></head><body>${await docHtml(b, opts)}</body></html>`;
 }

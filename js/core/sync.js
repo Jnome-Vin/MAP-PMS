@@ -82,7 +82,9 @@ export async function run() {
       if (!b) { await db.unqueue(e.seq); continue; }
       // ส่งหน้าบิลที่แอปสร้าง (หน้าตาเดียวกับที่พิมพ์) ให้ server ทำ PDF + การ์ด LINE
       const lang = M.langOf(b), c = M.calcBill(b);
-      const r = await api.call('sendBill', { billId: b.id, html: await docs.docPage(b, { lang }), lang,
+      let pdf = '';
+      try { pdf = await docs.docPdf(b, { lang }); } catch (e) { console.warn('สร้าง PDF ในเครื่องไม่ได้ ใช้ PDF จาก server แทน', e); }
+      const r = await api.call('sendBill', { billId: b.id, html: await docs.docPage(b, { lang }), pdf, lang,
         card: { title: M.property()[lang === 'en' ? 'nameEn' : 'name'] || M.property().name, room: b.room, period: b.period, invoiceNo: b.invoiceNo,
           lines: M.billLines(b, lang).map(l => ({ label: [l.label, l.sub].filter(Boolean).join(' '), amount: l.amount })), total: c.total, balance: c.balance, dueDate: b.dueDate } });
       if (b) await db.put('bills', { ...b, lineStatus: r.sent ? 'sent' : 'no-link', lineSentAt: r.sent ? new Date().toISOString() : '', pdfUrl: r.pdfUrl || b.pdfUrl || '' });
