@@ -23,40 +23,41 @@ const T = {
     price: 'Price/Unit', amount: 'Amount', total: 'Total', paid: 'Paid', balance: 'Balance', tenant: 'TENANT', preparer: 'PREPARER', receiver: 'RECEIVER', due: 'Due date' },
 };
 
-// ขนาดตามกระดาษ A4 (794×1123 px ที่ 96 dpi, ขอบ 15 มม.) — เส้นน้ำเงินล่างอยู่ชิดขอบล่างของหน้าเสมอ
+// เลย์เอาต์ตามใบแจ้งหนี้โปรแกรมเดิม บนกระดาษ A4 (794×1123 px ที่ 96 dpi)
+// ขอบบน 12 มม. ข้าง 16 มม. ล่าง 25 มม. — เส้นน้ำเงินล่างอยู่เหนือขอบล่าง มีพื้นที่กระดาษเหลือใต้เส้นเหมือนใบเดิม
 const CSS = `
-.doc{font-family:"IBM Plex Sans Thai","Sarabun","TH Sarabun New",sans-serif;color:#111;max-width:680px;margin:0 auto;font-size:15px;line-height:1.45}
+.doc{font-family:"IBM Plex Sans Thai","Sarabun","TH Sarabun New",sans-serif;color:#111;font-size:15px;line-height:1.5;max-width:680px;margin:0 auto}
 .doc table.lay{width:100%;border-collapse:collapse}
 .doc table.lay td{padding:0;vertical-align:top;border:0}
-.doc .logo{width:160px}.doc .brand{font-weight:700;color:#1b2a6b;font-size:20px}
-.doc .title{border:1.5px solid #111;border-radius:18px;padding:12px 10px;font-size:22px;font-weight:700;color:#c00;text-align:center}
-.doc .no{text-align:center;font-weight:700;margin-top:18px}
-.doc .rule{border-top:3px solid #1b2a6b;margin:8px 0 18px}
-.doc table.info{border-collapse:collapse;margin:0 0 18px 26px}
-.doc table.info td{padding:6px 0;border:0;vertical-align:top}
-.doc table.info td.k{width:190px}
+.doc .logo{width:165px}.doc .brand{font-weight:700;color:#1b2a6b;font-size:20px}
+.doc .title{border:1.5px solid #111;border-radius:16px;padding:12px 10px;font-size:21px;font-weight:700;color:#c00;text-align:center}
+.doc .no{text-align:center;font-weight:700;margin-top:22px}
+.doc .rule{border-top:3px solid #1b2a6b;margin:8px 0 16px}
+.doc table.info{border-collapse:collapse;margin:0 0 16px 30px}
+.doc table.info td{padding:5px 0;border:0;vertical-align:top}
+.doc table.info td.k{width:210px}
 .doc table.items{width:100%;border-collapse:separate;border-spacing:0;border:1.5px solid #111;border-radius:12px}
-.doc table.items th{font-weight:700;border-bottom:1px solid #111;border-left:1px solid #111;padding:13px 6px;text-align:center;white-space:nowrap}
-.doc table.items td{border-left:1px solid #111;padding:7px 14px;vertical-align:top}
+.doc table.items th{font-weight:700;border-bottom:1px solid #111;border-left:1px solid #111;padding:12px 6px;text-align:center;white-space:nowrap}
+.doc table.items td{border-left:1px solid #111;padding:6px 16px;vertical-align:top}
 .doc table.items th.f,.doc table.items td.f{border-left:0}
 .doc table.items td.f{white-space:nowrap}
 .doc table.items td.n{text-align:right;white-space:nowrap}.doc table.items td.c{text-align:center}
-.doc table.items tr.sp td{height:10px;padding:0 14px}
-.doc table.items tr.tot td{border-top:1px solid #111;font-weight:700;padding:12px 14px;white-space:normal}
-.doc .note{margin:34px 0 6px;font-size:15px;color:#111}
-.doc table.sign{border-collapse:collapse;margin:16px auto 0;width:94%}
+.doc table.items tr.sp td{height:8px;padding:0 16px}
+.doc table.items tr.tot td{border-top:1px solid #111;font-weight:700;padding:12px 16px;white-space:normal}
+.doc .note{margin:26px 0 0;font-size:15px;color:#111}
+.doc table.sign{border-collapse:collapse;margin:12px auto 0;width:94%}
 .doc table.sign td{padding:0;border:0;vertical-align:bottom}
 .doc table.sign td.lbl{white-space:nowrap;width:1%}
 .doc table.sign td.dots{text-align:center;width:45%}
 .doc table.sign td.gap{width:9%}
 .doc table.sign tr.img td{height:56px;text-align:center}
 .doc .sig{height:80px;position:relative;top:30px;z-index:1}   /* เลื่อนลงให้ปลายลายเซ็นทับเส้นประ (ไม่ลอย) */
-.doc .qr{text-align:center;margin-top:24px}.doc .qr img{width:330px}
+.doc .qr{text-align:center;margin:12px 0 34px}.doc .qr img{width:268px}
 .doc .stamp{color:#2e8b57;font-weight:700;font-size:16px;margin:30px 0 6px}
-.doc .foot{border-top:3px solid #1b2a6b;margin-top:26px}
-.a4{width:794px;height:1123px;padding:52px 57px;box-sizing:border-box;background:#fff}
-.a4 .doc{height:100%;display:flex;flex-direction:column}.a4 .doc .foot{margin-top:auto}
-@media print{.page .doc{min-height:272mm;display:flex;flex-direction:column}.page .doc .foot{margin-top:auto}}
+.doc .foot{border-top:3px solid #1b2a6b;margin-top:40px}
+.a4{width:794px;height:1123px;padding:36px 60px 110px;box-sizing:border-box;background:#fff;overflow:hidden}
+.a4 .doc{height:100%;max-width:none;display:flex;flex-direction:column}.a4 .doc .foot{margin-top:auto}
+@media print{.a4{height:296mm;break-after:page;page-break-after:always}.a4:last-child{break-after:auto;page-break-after:auto}}
 `;
 export const docCss = () => CSS;
 
@@ -72,7 +73,7 @@ export async function docHtml(b, { type = 'invoice', lang = M.langOf(b), payment
   <table class="lay"><tr>
     <td>${logo ? `<img class="logo" src="${logo}" alt="">` : `<div class="brand">${esc(p.nameEn || p.name)}</div>`}
       ${p.address || p.phone || p.taxId ? `<div style="font-size:12px">${esc(p.address || '')}${p.phone ? ' โทร ' + esc(p.phone) : ''}${p.taxId ? '<br>เลขประจำตัวผู้เสียภาษี ' + esc(p.taxId) : ''}</div>` : ''}</td>
-    <td style="width:290px;padding-top:8px"><div class="title">${type === 'receipt' ? t.receipt : t.invoice}</div><div class="no">NO. ${esc(no)}</div></td>
+    <td style="width:250px;padding-top:12px"><div class="title">${type === 'receipt' ? t.receipt : t.invoice}</div><div class="no">NO. ${esc(no)}</div></td>
   </tr></table>
   <div class="rule"></div>
   <table class="info">
@@ -101,6 +102,22 @@ export async function docHtml(b, { type = 'invoice', lang = M.langOf(b), payment
 }
 const fmt2 = n => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// บิลที่รายการเยอะจนเกินหน้า → ย่อทั้งใบให้พอดี 1 แผ่น A4 (เผื่อความสูงตอนพิมพ์ 296 มม.)
+const A4_CONTENT_PX = Math.floor(296 * 96 / 25.4) - 36 - 110 - 4;
+function fitA4(root) {
+  root.querySelectorAll('.a4 .doc').forEach(d => {
+    d.style.transform = d.style.height = d.style.width = d.style.maxWidth = '';
+    // ความสูงที่ต้องใช้จริง = ผลรวมความสูงของส่วนต่างๆ (ไม่นับช่องว่างยืดหยุ่นเหนือเส้นล่าง)
+    const need = [...d.children].reduce((h, k) => { const cs = getComputedStyle(k); return h + k.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom); }, 0);
+    if (need <= A4_CONTENT_PX) return;
+    const s = A4_CONTENT_PX / need;
+    d.style.transformOrigin = 'top left';
+    d.style.transform = `scale(${s.toFixed(4)})`;
+    d.style.width = d.style.maxWidth = `${(100 / s).toFixed(2)}%`;   // ขยายกล่องก่อนย่อ เพื่อให้ย่อแล้วยังเต็มความกว้าง/สูงพอดี
+    d.style.height = `${(100 / s).toFixed(2)}%`;
+  });
+}
+
 // PDF ขนาด A4 จริง วาดในเครื่องจากหน้าตาเดียวกับที่พิมพ์ (html2canvas + jsPDF) → ส่งให้ server เก็บใน Drive และแนบลิงก์ใน LINE
 // ตัวแปลง HTML→PDF ของ Google กำหนดขนาดกระดาษไม่ได้ จึงทำ PDF เองเพื่อให้ได้ A4 ตรงกับใบที่พิมพ์
 const LIBS = {
@@ -119,6 +136,7 @@ export async function docPdf(b, opts) {
   host.style.cssText = 'position:fixed;left:-10000px;top:0;z-index:-1';
   host.innerHTML = `<style>${CSS}</style><div class="a4">${await docHtml(b, opts)}</div>`;
   document.body.appendChild(host);
+  fitA4(host);
   try {
     // รอรูป (dataURL) โหลดเสร็จ — ไม่ใช้ img.decode() เพราะค้างได้เมื่อรูปอยู่นอกจอ
     await Promise.all([...host.querySelectorAll('img')].map(i => i.complete ? null
@@ -138,7 +156,12 @@ export async function docPage(b, opts) {
 export async function printDocs(list, opts = {}) {
   if (!list.length) return false;
   const pages = await Promise.all(list.map(b => docHtml(b, typeof opts === 'function' ? opts(b) : opts)));
-  $('#print-area').innerHTML = `<style>${CSS}</style>` + pages.map(h => `<div class="page">${h}</div>`).join('');
+  // 1 ใบ = 1 แผ่น A4 พอดี: ขอบกระดาษ 0 (ไม่มีหัว/ท้ายกระดาษของเบราว์เซอร์) แล้วจัดขอบเองในกรอบ .a4
+  const area = $('#print-area');
+  area.innerHTML = `<style>${CSS}@page{size:A4;margin:0}</style>` + pages.map(h => `<div class="a4">${h}</div>`).join('');
+  area.style.cssText = 'display:block;position:absolute;left:-99999px;top:0';   // วัดขนาดนอกจอ
+  fitA4(area);
+  area.style.cssText = '';
   setTimeout(() => window.print(), 80);
   return true;
 }
