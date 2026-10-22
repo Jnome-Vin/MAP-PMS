@@ -140,12 +140,19 @@ export default {
       toast(`ยกเลิกการผูก LINE ห้อง ${l.room} แล้ว`); re();
     });
     $e('#codes').onclick = async () => {
-      // สร้างรหัสผูก LINE ให้ห้องที่ยังไม่มี
-      for (const r of M.rooms().filter(r => r.kind === 'room' || r.kind === 'kiosk')) if (!r.lineCode) await db.put('rooms', { ...r, lineCode: randomString(6, '0123456789') });
-      const box = openModal(`<h3>รหัสผูก LINE OA</h3><p class="note">ให้ผู้เช่าส่งข้อความ <b>เลขห้อง-รหัส</b> มาที่ LINE OA</p>
-        <div class="scroll" style="max-height:50vh"><table class="tbl"><thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ข้อความที่ต้องส่ง</th><th>สถานะ</th></tr></thead><tbody>
-        ${M.rooms().filter(r => r.lineCode).map(r => { const l = M.lineLinkOf(r.id); return `<tr><td>${r.id}</td><td>${esc(M.tenantOf(r.id)?.name || '-')}</td><td><code>${r.id}-${r.lineCode}</code></td><td>${l ? '✅ ' + esc(l.displayName || '') : '-'}</td></tr>`; }).join('')}
+      // สร้างรหัสผูก LINE ให้ห้องที่ยังไม่มี: ห้องพัก/Kiosk ทุกห้อง + ห้องประเภทอื่นที่มีผู้เช่า (เช่น 102 ห้องซักผ้า)
+      for (const r of M.rooms().filter(r => r.kind === 'room' || r.kind === 'kiosk' || M.tenantOf(r.id))) if (!r.lineCode) await db.put('rooms', { ...r, lineCode: randomString(6, '0123456789') });
+      const msgFor = r => `${M.property().name} — ห้อง ${r.id}\nรับบิลค่าเช่าทาง LINE: พิมพ์ข้อความนี้ส่งกลับมาในแชทนี้\n${r.id}-${r.lineCode}`;
+      const box = openModal(`<h3>รหัสผูก LINE OA</h3><p class="note">ให้ผู้เช่าส่งข้อความ <b>เลขห้อง-รหัส</b> มาที่ LINE OA · กด 📋 เพื่อคัดลอกข้อความไปวางในแชทของผู้เช่า</p>
+        <div class="scroll" style="max-height:50vh"><table class="tbl"><thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ข้อความที่ต้องส่ง</th><th>สถานะ</th><th></th></tr></thead><tbody>
+        ${M.rooms().filter(r => r.lineCode).map(r => { const l = M.lineLinkOf(r.id); return `<tr><td>${r.id}</td><td>${esc(M.tenantOf(r.id)?.name || '-')}</td><td><code>${r.id}-${r.lineCode}</code></td><td>${l ? '✅ ' + esc(l.displayName || '') : '-'}</td>
+          <td><button class="btn sm" data-copy="${r.id}" title="คัดลอกข้อความพร้อมรหัส">📋 คัดลอก</button></td></tr>`; }).join('')}
         </tbody></table></div><div class="form-acts"><button class="btn" id="cx">ปิด</button><button class="btn pri" id="cp">พิมพ์ใบแจ้งรหัส</button></div>`, { wide: true });
+      box.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
+        const r = db.get('rooms', b.dataset.copy);
+        try { await navigator.clipboard.writeText(msgFor(r)); b.textContent = '✔ คัดลอกแล้ว'; toast(`คัดลอกข้อความห้อง ${r.id} แล้ว — ไปวางในแชท LINE ของผู้เช่าได้เลย`); }
+        catch { toast('คัดลอกไม่ได้ — เลือกข้อความในช่องรหัสแล้วกด Ctrl+C แทน', 4000); }
+      });
       box.querySelector('#cx').onclick = closeModal;
       box.querySelector('#cp').onclick = () => {
         document.querySelector('#print-area').innerHTML = M.rooms().filter(r => r.lineCode && M.tenantOf(r.id)).map(r => `<div class="bill"><h4>${esc(M.property().name)} — ห้อง ${r.id}</h4>
