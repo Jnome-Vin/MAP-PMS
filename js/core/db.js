@@ -81,9 +81,9 @@ export async function getPhoto(id) { return id ? req(tx('photos').get(id)) : nul
 
 // ---------- outbox (คิวรออัปโหลด) ----------
 export async function queue(entry) {
-  // รวมรายการ put ซ้ำของ record เดียวกันไว้รายการเดียว
-  if (entry.kind === 'put') {
-    const dup = (await outbox()).find(e => e.kind === 'put' && e.col === entry.col && e.id === entry.id);
+  // รวมรายการ put ซ้ำของ record เดียวกันไว้รายการเดียว · บิลที่รอส่ง LINE อยู่แล้วไม่ส่งซ้ำ (กันโควตาข้อความหมด)
+  if (entry.kind === 'put' || entry.kind === 'line') {
+    const dup = (await outbox()).find(e => e.kind === entry.kind && (entry.kind === 'put' ? e.col === entry.col && e.id === entry.id : e.billId === entry.billId));
     if (dup) return;
   }
   await req(tx('outbox', 'readwrite').add({ ...entry, at: new Date().toISOString(), by: actor }));
