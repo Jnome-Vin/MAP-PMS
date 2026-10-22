@@ -73,6 +73,8 @@ function route() {
   const s = auth.current();
   if (!s) return renderLogin(root, route);
   if (s.mustChange) return renderChangePassword(root, route, { forced: true });
+  // เพิ่งเข้าสู่ระบบ: ล้างสถานะ "ต้องเข้าสู่ระบบ" ที่ค้างจากตอนเปิดแอปก่อน login แล้วซิงก์ทันที (ดึงข้อมูลจาก server)
+  if (s.token) { sync.tokenReady(); sync.run(); }
   renderShell();
 }
 

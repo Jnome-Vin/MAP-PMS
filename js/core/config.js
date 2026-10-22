@@ -1,7 +1,7 @@
 // ค่าตั้งต้นของแอป — URL ของ Apps Script ตั้งได้จากหน้า "ตั้งค่า" (เก็บใน localStorage)
 export const APP = {
   name: 'มีชัย อพาร์ทเม้นท์',
-  version: '0.9.12',
+  version: '0.9.13',
   hashIterations: 1000,          // ต้องตรงกับ backend/Auth.gs
   sessionHours: 12,
   minPasswordLength: 8,
