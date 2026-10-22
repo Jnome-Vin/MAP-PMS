@@ -5,7 +5,7 @@ import * as auth from '../core/auth.js';
 import * as api from '../core/api.js';
 import * as sync from '../core/sync.js';
 import { getApiUrl, setApiUrl, APP } from '../core/config.js';
-import { esc, toast, openModal, closeModal, confirmBox } from '../core/ui.js';
+import { esc, toast, openModal, closeModal, confirmBox, thDate } from '../core/ui.js';
 import { randomString } from '../core/auth.js';
 
 const num = (el, id) => Number(el.querySelector('#' + id).value) || 0;
@@ -49,6 +49,7 @@ export default {
     const rt = M.rates(), p = M.property(), admin = auth.can('rooms.manage');
     const auto = await sync.autoUpload();
     const links = db.all('lineLinks');
+    const lineAdmin = auth.current()?.role === 'admin';   // server ให้แก้ข้อมูล LINE ได้เฉพาะ Administrator
     el.innerHTML = `
     <div class="top"><h2>ตั้งค่า</h2><span class="note">เวอร์ชัน ${APP.version}</span></div>
     <div class="grid2">
@@ -93,6 +94,9 @@ export default {
 
       <div class="card"><b>LINE OA</b> <span class="pill ${links.length ? 'ok' : 'idle'}">ผูกแล้ว ${links.filter(l => l.active !== false).length} ห้อง</span>
         <p class="note">ผู้เช่าเพิ่มเพื่อน LINE OA แล้วพิมพ์ <b>เลขห้อง-รหัส</b> เช่น <code>304-482913</code> ระบบจะผูกบัญชีกับห้องและตั้งชื่อเป็น "304-ชื่อผู้เช่า" · Channel access token ตั้งใน Apps Script (Script properties) ไม่เก็บในแอป</p>
+        ${links.some(l => l.active !== false) ? `<table class="tbl" style="margin-top:8px"><thead><tr><th>ห้อง</th><th>ชื่อในระบบ</th><th>ชื่อ LINE</th><th>ผูกเมื่อ</th>${lineAdmin ? '<th></th>' : ''}</tr></thead><tbody>
+          ${links.filter(l => l.active !== false).sort((a, b) => String(a.room).localeCompare(String(b.room))).map(l => `<tr><td><b>${esc(l.room)}</b></td><td>${esc(l.displayName || '')}</td><td>${esc(l.lineName || '-')}</td>
+            <td class="note">${l.linkedAt ? thDate(l.linkedAt) : '-'}</td>${lineAdmin ? `<td><button class="btn sm danger" data-unlink="${esc(l.id)}">ยกเลิกการผูก</button></td>` : ''}</tr>`).join('')}</tbody></table>` : ''}
         <div class="form-acts"><button class="btn" id="codes">ดู/พิมพ์รหัสผูก LINE ของแต่ละห้อง</button></div></div>
 
       <div class="card"><b>จัดการห้อง</b> ${admin ? '' : '<span class="pill idle">เฉพาะ Administrator</span>'}
@@ -127,6 +131,13 @@ export default {
       if (!getApiUrl()) return toast('ยังไม่ได้เชื่อม Google');
       if (!await confirmBox('อัปโหลดข้อมูลทั้งหมด (ห้อง ผู้เช่า ที่จอด บิล) ขึ้น Google Sheet?', 'อัปโหลด')) return;
       await sync.queueEverything(); sync.run(); toast('เข้าคิวอัปโหลดแล้ว');
+    });
+    // ยกเลิกการผูก LINE (เช่น บัญชีทดสอบ ผู้เช่าย้ายออก เปลี่ยนเครื่อง) — ผูกใหม่ได้ด้วยการพิมพ์รหัสห้องในแชท OA อีกครั้ง
+    el.querySelectorAll('[data-unlink]').forEach(b => b.onclick = async () => {
+      const l = links.find(x => x.id === b.dataset.unlink); if (!l) return;
+      if (!await confirmBox(`ยกเลิกการผูก LINE "${l.lineName || l.displayName || ''}" กับห้อง ${l.room}? บัญชีนี้จะไม่ได้รับบิลของห้องนี้อีก`, 'ยกเลิกการผูก')) return re();
+      await db.put('lineLinks', { ...l, active: false, unlinkedAt: new Date().toISOString() });
+      toast(`ยกเลิกการผูก LINE ห้อง ${l.room} แล้ว`); re();
     });
     $e('#codes').onclick = async () => {
       // สร้างรหัสผูก LINE ให้ห้องที่ยังไม่มี
