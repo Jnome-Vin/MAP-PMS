@@ -15,7 +15,8 @@ export default {
     const unpaid = db.all('bills').filter(b => ['due', 'late', 'partial'].includes(M.billState(b)));
     const late = unpaid.filter(b => M.billState(b) === 'late');
     const tenants = db.all('tenants').filter(t => t.active);
-    const fixed = M.rooms().reduce((a, r) => a + (M.tenantOf(r.id) || r.kind === 'kiosk' ? Number(r.rent) || 0 : 0), 0)
+    // ค่าเช่าตามสัญญาผู้เช่า (ถ้ามี) ไม่เช่นนั้นใช้ค่าเช่าของห้อง — ตรงกับที่ใช้ออกบิล
+    const fixed = M.rooms().reduce((a, r) => { const t = M.tenantOf(r.id); return a + (t || r.kind === 'kiosk' ? Number(t?.rent ?? r.rent) || 0 : 0); }, 0)
       + tenants.reduce((a, t) => a + (Number(t.fridge) || 0) + (Number(t.parkingFee) || 0), 0);
     const bdays = birthdaysThisMonth();
     const slipBad = db.all('bills').filter(hasSlipIssue);
@@ -113,7 +114,7 @@ function kpiDetail(kind, { unpaid, late }, nav, rerender) {
   }
   if (kind === 'fixed') {
     const list = M.rooms().map(r => {
-      const t = M.tenantOf(r.id), rent = t || r.kind === 'kiosk' ? Number(r.rent) || 0 : 0;
+      const t = M.tenantOf(r.id), rent = t || r.kind === 'kiosk' ? Number(t?.rent ?? r.rent) || 0 : 0;
       return { r, t, rent, fridge: Number(t?.fridge) || 0, park: Number(t?.parkingFee) || 0 };
     }).filter(x => x.rent + x.fridge + x.park);
     const tot = k => sum(list, x => x[k]);
