@@ -1,7 +1,8 @@
 // เอกสารบิล: ใบแจ้งหนี้ / ใบเสร็จรับเงิน (ไทย/อังกฤษ) หน้าตาตามโปรแกรมเดิม (Invoi-L.rpt)
 // ใช้ทั้งพิมพ์ในเครื่อง และส่งให้ server ทำ PDF ส่ง LINE
 import * as M from './model.js';
-import { esc, fmt, bahtText, englishAmount, thDate, $ } from './ui.js';
+import { esc, fmt, bahtText, englishAmount, thDate } from './ui.js';
+import { printInFrame } from './printframe.js';
 
 const ASSETS = { logo: 'assets/logo.png', qr: 'assets/payment-qr.png', sign: 'assets/signature.png' };
 const cache = {};
@@ -108,7 +109,8 @@ function fitA4(root) {
   root.querySelectorAll('.a4 .doc').forEach(d => {
     d.style.transform = d.style.height = d.style.width = d.style.maxWidth = '';
     // ความสูงที่ต้องใช้จริง = ผลรวมความสูงของส่วนต่างๆ (ไม่นับช่องว่างยืดหยุ่นเหนือเส้นล่าง)
-    const need = [...d.children].reduce((h, k) => { const cs = getComputedStyle(k); return h + k.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom); }, 0);
+    const win = d.ownerDocument.defaultView;   // อาจอยู่ในกรอบพิมพ์ (iframe)
+    const need = [...d.children].reduce((h, k) => { const cs = win.getComputedStyle(k); return h + k.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom); }, 0);
     if (need <= A4_CONTENT_PX) return;
     const s = A4_CONTENT_PX / need;
     d.style.transformOrigin = 'top left';
@@ -212,14 +214,11 @@ export async function refundDocHtml(t) {
 }
 export async function printRefundDoc(t) { return printA4([await refundDocHtml(t)]); }
 
-// พิมพ์เอกสารชุดหนึ่ง (แต่ละหน้าเป็น HTML ของ .doc)
+// พิมพ์เอกสารชุดหนึ่ง (แต่ละหน้าเป็น HTML ของ .doc) จากกรอบแยก (core/printframe.js)
+// 1 ใบ = 1 แผ่น A4 พอดี: ขอบกระดาษ 0 (ไม่มีหัว/ท้ายกระดาษของเบราว์เซอร์) แล้วจัดขอบเองในกรอบ .a4
+export function a4Html(pages) {
+  return `<style>${CSS}@page{size:A4;margin:0}</style>` + pages.map(h => `<div class="a4">${h}</div>`).join('');
+}
 function printA4(pages) {
-  // 1 ใบ = 1 แผ่น A4 พอดี: ขอบกระดาษ 0 (ไม่มีหัว/ท้ายกระดาษของเบราว์เซอร์) แล้วจัดขอบเองในกรอบ .a4
-  const area = $('#print-area');
-  area.innerHTML = `<style>${CSS}@page{size:A4;margin:0}</style>` + pages.map(h => `<div class="a4">${h}</div>`).join('');
-  area.style.cssText = 'display:block;position:absolute;left:-99999px;top:0';   // วัดขนาดนอกจอ
-  fitA4(area);
-  area.style.cssText = '';
-  setTimeout(() => window.print(), 80);
-  return true;
+  return printInFrame(a4Html(pages), doc => fitA4(doc));
 }

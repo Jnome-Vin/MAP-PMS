@@ -3,6 +3,7 @@
 import { APP } from './config.js';
 import * as M from './model.js';
 import * as auth from './auth.js';
+import { printInFrame } from './printframe.js';
 
 const LANDSCAPE = new Set(['floorplan', 'parking']);   // ผังกว้าง → พิมพ์แนวนอน
 const PX_PER_MM = 96 / 25.4, MARGIN_MM = 10;
@@ -13,12 +14,26 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 let preparedAt = 0;
 new MutationObserver(() => { preparedAt = Date.now(); }).observe(area(), { childList: true });
 
+// ปุ่ม 🖨️: เตรียมหน้าใน #print-area (วัดขนาด/ย่อ) แล้วพิมพ์จากกรอบแยก
 export function printScreen(opts = {}) {
   build(opts);
-  setTimeout(() => window.print(), 80);
+  return printInFrame(area().innerHTML);
 }
 
-window.addEventListener('beforeprint', () => { if (Date.now() - preparedAt > 1500) build(); });
+// Ctrl+P / เมนูพิมพ์ของเบราว์เซอร์ พิมพ์จากหน้าแอปโดยตรง: ซ่อนองค์ประกอบอื่นทั้งหมดแบบ inline !important
+// (ชนะสไตล์ที่ส่วนเสริมเบราว์เซอร์บังคับไว้) แล้วคืนค่าหลังพิมพ์
+let hidden = [];
+window.addEventListener('beforeprint', () => {
+  if (Date.now() - preparedAt > 1500) build();
+  const others = [...document.documentElement.children].filter(e => e.tagName !== 'HEAD' && e.tagName !== 'BODY')
+    .concat([...document.body.children].filter(e => e.id !== 'print-area' && e.tagName !== 'SCRIPT'));
+  hidden = others.map(e => [e, e.getAttribute('style')]);
+  others.forEach(e => e.style.setProperty('display', 'none', 'important'));
+});
+window.addEventListener('afterprint', () => {
+  hidden.forEach(([e, s]) => s == null ? e.removeAttribute('style') : e.setAttribute('style', s));
+  hidden = [];
+});
 
 function build({ landscape } = {}) {
   const modalOn = document.getElementById('modal').classList.contains('on');

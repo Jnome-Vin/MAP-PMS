@@ -2,6 +2,7 @@
 import * as db from '../core/db.js';
 import * as M from '../core/model.js';
 import { $, esc, fmt, periodLabel, periodOf, thDate, downloadCsv } from '../core/ui.js';
+import { printInFrame } from '../core/printframe.js';
 
 let kind = 'income', period = null, year = null;   // ตั้งค่าตอนเปิดหน้าแรก (ฐานข้อมูลยังไม่พร้อมตอนโหลดไฟล์)
 let from = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10), to = new Date().toISOString().slice(0, 10);
@@ -113,9 +114,8 @@ export default {
     el.querySelector('#xls').onclick = () => downloadCsv(`${KINDS[kind].replace(/^\d+\.\s*/, '')}-${r.subtitle}.csv`.replace(/[\\/:*?"<>|]/g, '-'),
       [[p.name], [KINDS[kind], r.subtitle], [], r.head, ...r.rows, r.foot]);
     el.querySelector('#pdf').onclick = () => {
-      $('#print-area').innerHTML = `<div class="page" style="font-family:'IBM Plex Sans Thai',sans-serif"><div style="display:flex;justify-content:space-between">
-        <div><b style="color:#1b2a6b">${esc(p.name)}</b><br>${KINDS[kind].replace(/^\d+\.\s*/, '')} ${r.subtitle}</div><div>${thDate(new Date().toISOString())}</div></div><br>${tableHtml(r, 'rep')}</div>`;
-      setTimeout(() => window.print(), 50);
+      printInFrame(`<div class="page" style="font-family:'IBM Plex Sans Thai',sans-serif"><div style="display:flex;justify-content:space-between">
+        <div><b style="color:#1b2a6b">${esc(p.name)}</b><br>${KINDS[kind].replace(/^\d+\.\s*/, '')} ${r.subtitle}</div><div>${thDate(new Date().toISOString())}</div></div><br>${tableHtml(r, 'rep')}</div>`);
     };
   },
 };

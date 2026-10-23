@@ -5,6 +5,7 @@ import * as M from '../core/model.js';
 import * as auth from '../core/auth.js';
 import { isServerMode } from '../core/config.js';
 import { docHtml, docCss, printDocs } from '../core/docs.js';
+import { printInFrame } from '../core/printframe.js';
 import { esc, fmt, fmt0, toast, openModal, closeModal, confirmBox, periodLabel, periodOf, shiftPeriod, thDate, uid } from '../core/ui.js';
 import * as api from '../core/api.js';
 import { compress, fileToDataUrl, photoThumb } from './tenants.js';
@@ -523,10 +524,9 @@ export default {
 // แบบฟอร์มจดมิเตอร์ (พิมพ์ไปเดินจด)
 function printMeterForm(rows) {
   const p = M.property();
-  document.querySelector('#print-area').innerHTML = `<div class="page" style="font-family:'IBM Plex Sans Thai',sans-serif">
+  printInFrame(`<div class="page" style="font-family:'IBM Plex Sans Thai',sans-serif">
     <h3 style="margin:0">${esc(p.name)} — แบบฟอร์มจดมิเตอร์น้ำ-ไฟ</h3><p>สำหรับบิลเดือน ${periodLabel(period)} · วันที่จด ....................... ผู้จด .......................</p>
     <table class="rep" style="font-size:13px"><thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>น้ำ เดิม</th><th style="width:110px">น้ำ ใหม่</th><th>ไฟ เดิม</th><th style="width:110px">ไฟ ใหม่</th><th>หมายเหตุ</th></tr></thead><tbody>
     ${rows.map(b => `<tr style="height:30px"><td>${b.room}</td><td>${esc(b.tenantName)}</td><td>${b.wPrev ?? ''}</td><td></td><td>${b.ePrev ?? ''}</td><td></td><td></td></tr>`).join('')}
-    </tbody></table></div>`;
-  setTimeout(() => window.print(), 50);
+    </tbody></table></div>`);
 }

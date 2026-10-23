@@ -7,6 +7,7 @@ import * as sync from '../core/sync.js';
 import { getApiUrl, setApiUrl, APP } from '../core/config.js';
 import { esc, toast, openModal, closeModal, confirmBox, thDate } from '../core/ui.js';
 import { randomString } from '../core/auth.js';
+import { printInFrame } from '../core/printframe.js';
 
 const num = (el, id) => Number(el.querySelector('#' + id).value) || 0;
 const val = (el, id) => el.querySelector('#' + id).value.trim();
@@ -155,9 +156,8 @@ export default {
       });
       box.querySelector('#cx').onclick = closeModal;
       box.querySelector('#cp').onclick = () => {
-        document.querySelector('#print-area').innerHTML = M.rooms().filter(r => r.lineCode && M.tenantOf(r.id)).map(r => `<div class="bill"><h4>${esc(M.property().name)} — ห้อง ${r.id}</h4>
-          <p>รับบิลค่าเช่าทาง LINE: เพิ่มเพื่อน LINE OA ของอาคาร แล้วพิมพ์ข้อความนี้</p><p style="font-size:28px;font-family:monospace"><b>${r.id}-${r.lineCode}</b></p></div>`).join('');
-        setTimeout(() => window.print(), 50);
+        printInFrame(M.rooms().filter(r => r.lineCode && M.tenantOf(r.id)).map(r => `<div class="bill"><h4>${esc(M.property().name)} — ห้อง ${r.id}</h4>
+          <p>รับบิลค่าเช่าทาง LINE: เพิ่มเพื่อน LINE OA ของอาคาร แล้วพิมพ์ข้อความนี้</p><p style="font-size:28px;font-family:monospace"><b>${r.id}-${r.lineCode}</b></p></div>`).join(''));
       };
     };
     el.querySelectorAll('[data-room]').forEach(b => b.onclick = () => roomForm(db.get('rooms', b.dataset.room), re));
