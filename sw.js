@@ -1,7 +1,7 @@
 // Service worker: เก็บไฟล์แอปไว้ในเครื่องเพื่อเปิดใช้งานได้แม้ไม่มีอินเทอร์เน็ต
 // มีเน็ต → ดึงไฟล์ล่าสุดจาก server เสมอ (ได้เวอร์ชันใหม่ทันที) / ไม่มีเน็ตหรือช้าเกิน 4 วินาที → ใช้ไฟล์ในเครื่อง
 // เมื่อแก้ไฟล์ในแอป ให้เปลี่ยน VERSION ด้วย
-const VERSION = 'map-pms-v0.9.25';
+const VERSION = 'map-pms-v0.9.26';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'icons/icon.svg', 'css/app.css', 'assets/logo.png', 'assets/brand-logo.png', 'assets/signature.png', 'assets/payment-qr.png',
   'js/main.js', 'js/core/config.js', 'js/core/ui.js', 'js/core/db.js', 'js/core/api.js', 'js/core/auth.js',

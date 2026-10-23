@@ -249,6 +249,10 @@ svg.park{width:100%;height:auto;background:#fbfcfd;border:1px solid var(--line);
 #print-area{display:none}
 @media print{
   body>*:not(#print-area){display:none!important}
+  /* ส่วนเสริมของเบราว์เซอร์ (Grammarly, ChatGPT sidebar ฯลฯ) แทรกองค์ประกอบไว้นอก <body> → ทำให้มีหน้าว่างเกินมา */
+  html>*:not(head):not(body),body~*{display:none!important}
+  html,body{height:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important}
+  #print-area>:last-child{break-after:auto!important;page-break-after:auto!important}
   #print-area{display:block}
   #print-area .page{page-break-after:always}
   #print-area .page:last-child{page-break-after:auto}

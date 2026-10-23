@@ -57,7 +57,7 @@ const CSS = `
 .doc .foot{border-top:3px solid #1b2a6b;margin-top:40px}
 .a4{width:794px;height:1123px;padding:36px 60px 110px;box-sizing:border-box;background:#fff;overflow:hidden}
 .a4 .doc{height:100%;max-width:none;display:flex;flex-direction:column}.a4 .doc .foot{margin-top:auto}
-@media print{.a4{height:296mm;break-after:page;page-break-after:always}.a4:last-child{break-after:auto;page-break-after:auto}}
+@media print{.a4{height:295mm;break-after:page;page-break-after:always}.a4:last-child{break-after:auto;page-break-after:auto}}
 `;
 export const docCss = () => CSS;
 
@@ -103,7 +103,7 @@ export async function docHtml(b, { type = 'invoice', lang = M.langOf(b), payment
 const fmt2 = n => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // บิลที่รายการเยอะจนเกินหน้า → ย่อทั้งใบให้พอดี 1 แผ่น A4 (เผื่อความสูงตอนพิมพ์ 296 มม.)
-const A4_CONTENT_PX = Math.floor(296 * 96 / 25.4) - 36 - 110 - 4;
+const A4_CONTENT_PX = Math.floor(295 * 96 / 25.4) - 36 - 110 - 4;
 function fitA4(root) {
   root.querySelectorAll('.a4 .doc').forEach(d => {
     d.style.transform = d.style.height = d.style.width = d.style.maxWidth = '';
