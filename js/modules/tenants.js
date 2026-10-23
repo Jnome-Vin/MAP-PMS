@@ -6,6 +6,7 @@ import * as api from '../core/api.js';
 import { isServerMode } from '../core/config.js';
 import { $, esc, fmt0, thDate, toast, openModal, closeModal, confirmBox, uid, periodLabel } from '../core/ui.js';
 import { readIdDocument, occ, occName } from '../core/idcard.js';
+import { printRefundDoc, nextRefundNo } from '../core/docs.js';
 
 let q = '', filter = 'active';
 
@@ -270,6 +271,14 @@ export async function moveOut(t, done) {
     <button class="btn sm" id="mo-add" type="button" style="margin-top:6px">＋ เพิ่มรายการ</button>
     <div class="card" style="margin-top:12px;padding:12px"><div class="toolbar" style="justify-content:space-between"><span>รวมหัก (ค่าน้ำ ค่าไฟ และรายการหัก)</span><b id="mo-ded">0</b></div>
       <div class="toolbar" style="justify-content:space-between;font-size:18px;margin-top:6px"><span id="mo-lbl">คงเหลือคืนเงินประกันทั้งสิ้น</span><b id="mo-ref">0</b></div></div>
+    <div id="mo-howbox" style="margin-top:10px">
+      <div class="toolbar"><b>คืนเงินโดย</b>
+        <div class="seg" id="mo-how"><button type="button" data-how="" class="on">ยังไม่ระบุ</button><button type="button" data-how="cash">💵 เงินสด</button><button type="button" data-how="transfer">🏦 โอนเข้าบัญชี</button></div></div>
+      <div class="form" id="mo-acct" hidden style="margin-top:8px">
+        <label>ธนาคาร</label><input id="mo-bank" placeholder="เช่น กสิกรไทย" value="${esc(t.refundBank || '')}">
+        <label>เลขที่บัญชี</label><input id="mo-acctno" inputmode="numeric" placeholder="xxx-x-xxxxx-x" value="${esc(t.refundAcctNo || '')}">
+        <label>ชื่อบัญชี</label><input id="mo-acctname" value="${esc(t.refundAcctName || t.name || '')}"></div>
+      <p class="note" style="margin:6px 0 0">พิมพ์ลงใบคืนเงินประกัน · ถ้ายังไม่ระบุ จะเว้นช่องให้เขียนเอง</p></div>
     <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input id="mo-slot" type="checkbox" checked> ปล่อยช่องจอด ${M.slotsOf(t.room).map(s => s.id).join(', ') || '-'} ให้ว่าง</label>
     <div class="err" id="mo-err"></div>
     <div class="form-acts"><button class="btn" id="mox">ยกเลิก</button><button class="btn" id="mook">บันทึกย้ายออก</button><button class="btn pri" id="moprint">บันทึก + พิมพ์เอกสารคืนเงิน</button></div>`, { wide: true });
@@ -288,8 +297,16 @@ export async function moveOut(t, done) {
     const ded = items.filter(o => o.name || Number(o.amount)).map(o => ({ name: o.name.trim(), amount: Number(o.amount) || 0 }));
     const deposit = n('mo-dep') || 0, totalDed = c.water + c.elec + ded.reduce((a, o) => a + o.amount, 0);
     return { date: v('mo-date'), deposit, wPrev: n('mo-wp'), wCur: n('mo-wc'), wu: c.wu, wRate: rt.water, water: c.water, wMin: c.wMin ? c.wBilled : null,
-      ePrev: n('mo-ep'), eCur: n('mo-ec'), eu: c.eu, eRate: rt.elec, elec: c.elec, eMin: c.eMin ? c.eBilled : null, items: ded, totalDed, refund: Math.round((deposit - totalDed) * 100) / 100 };
+      ePrev: n('mo-ep'), eCur: n('mo-ec'), eu: c.eu, eRate: rt.elec, elec: c.elec, eMin: c.eMin ? c.eBilled : null, items: ded, totalDed, refund: Math.round((deposit - totalDed) * 100) / 100,
+      refundMethod: how, ...(how === 'transfer' ? { bank: v('mo-bank').trim(), acctNo: v('mo-acctno').trim(), acctName: v('mo-acctname').trim() } : {}) };
   };
+  // วิธีคืนเงิน: เงินสด / โอนเข้าบัญชี (แสดงช่องบัญชีเมื่อเลือกโอน)
+  let how = '';
+  box.querySelectorAll('[data-how]').forEach(b => b.onclick = () => {
+    how = b.dataset.how;
+    box.querySelectorAll('[data-how]').forEach(x => x.classList.toggle('on', x === b));
+    box.querySelector('#mo-acct').hidden = how !== 'transfer';
+  });
   const calc = () => {
     const d = doc();
     box.querySelector('#mo-wu').textContent = d.wu ?? '-'; box.querySelector('#mo-wa').textContent = d.wu != null ? fmt0(d.water) : '-';
@@ -298,6 +315,7 @@ export async function moveOut(t, done) {
     box.querySelector('#mo-lbl').textContent = d.refund >= 0 ? 'คงเหลือคืนเงินประกันทั้งสิ้น' : 'ผู้เช่าต้องชำระเพิ่ม';
     box.querySelector('#mo-ref').textContent = '฿' + Math.abs(d.refund).toLocaleString('th-TH');
     box.querySelector('#mo-ref').style.color = d.refund >= 0 ? 'var(--ok)' : 'var(--bad)';
+    box.querySelector('#mo-howbox').hidden = d.refund < 0;   // ผู้เช่าต้องจ่ายเพิ่ม → ไม่มีการคืนเงิน
   };
   drawItems(); calc();
   ['mo-wp', 'mo-wc', 'mo-ep', 'mo-ec', 'mo-dep', 'mo-date'].forEach(id => box.querySelector('#' + id).oninput = calc);
@@ -307,6 +325,9 @@ export async function moveOut(t, done) {
   const save = async print => {
     const d = doc();
     if (d.wCur == null || d.eCur == null) return box.querySelector('#mo-err').textContent = 'กรุณาจดเลขมิเตอร์น้ำและไฟตอนย้ายออก';
+    if (d.refund >= 0 && how === 'transfer' && !d.acctNo) return box.querySelector('#mo-err').textContent = 'กรุณาใส่เลขที่บัญชีสำหรับโอนคืนเงิน';
+    if (d.refund < 0) { delete d.bank; delete d.acctNo; delete d.acctName; d.refundMethod = ''; }
+    d.no = nextRefundNo(d.date, db.all('tenants'));   // เลขที่ใบคืนเงินประกัน RF6910-1
     if ((d.wu ?? 0) < 0 || (d.eu ?? 0) < 0) return box.querySelector('#mo-err').textContent = 'เลขมิเตอร์ตอนออกน้อยกว่าเลขเดิม กรุณาตรวจสอบ';
     const releaseSlots = box.querySelector('#mo-slot').checked ? M.slotsOf(t.room) : [];
     const rec = { ...t, active: false, moveOut: d.date, moveOutAt: new Date().toISOString(), moveOutMeter: { w: d.wCur, e: d.eCur },
@@ -321,7 +342,8 @@ export async function moveOut(t, done) {
   box.querySelector('#moprint').onclick = () => save(true);
 }
 
-export const printRefund = t => { $('#print-area').innerHTML = `<div class="page">${refundHtml(t)}</div>`; setTimeout(() => window.print(), 50); };
+// ใบคืนเงินประกัน A4 รูปแบบเดียวกับใบแจ้งหนี้ (core/docs.js)
+export const printRefund = t => printRefundDoc(t);
 
 // ยกเลิกการย้ายออก: คืนสถานะผู้เช่า + ช่องจอดเดิม (ถ้ายังว่าง)
 export async function cancelMoveOut(t, done) {
@@ -333,33 +355,6 @@ export async function cancelMoveOut(t, done) {
   for (const s of moveOutSlots || []) { const cur = db.get('slots', s.id); if (cur && !cur.room) { await db.put('slots', { ...cur, room: t.room, plate: s.plate, vehicle: s.vehicle }); back.push(s.id); } }
   toast(`ยกเลิกการย้ายออกแล้ว${back.length ? ' · คืนช่องจอด ' + back.join(', ') : (moveOutSlots ? '' : ' · กรุณาตรวจสอบช่องจอดรถอีกครั้ง')}`, 4000);
   done?.();
-}
-
-// เอกสารคืนเงินประกัน (ตามแบบที่ใช้อยู่)
-const TH_MONTH = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-const longDate = iso => { const [y, m, d] = String(iso).split('-').map(Number); return y ? `${d} ${TH_MONTH[m - 1]} ${y + 543}` : '-'; };
-// "0 หน่วย (คิดขั้นต่ำ 1 หน่วย)" เมื่อใช้น้อยกว่าขั้นต่ำ
-const units = (u, min) => min != null ? `${u} หน่วย (คิดขั้นต่ำ ${min} หน่วย)` : `${u} หน่วย`;
-export function refundHtml(t) {
-  const d = t.moveOutDoc; if (!d) return '<p>ไม่มีข้อมูลเอกสารคืนเงิน</p>';
-  const money = x => (Number(x) || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 });
-  const row = (label, detail, amount, red) => `<tr><td>${label}</td><td>${detail || ''}</td><td class="c">=</td><td class="n" style="${red ? 'color:#c00' : ''}">${money(amount)}</td><td>บาท</td></tr>`;
-  return `<div class="refund">
-    <h3>เอกสารคืนเงิน ห้อง ${esc(t.room)}</h3>
-    <p class="date">วันที่ ${longDate(d.date)}</p>
-    <p>ผู้เช่า: ${esc(t.name)}</p>
-    <table>
-      ${row('เงินประกัน', '', d.deposit)}
-      <tr class="sp"><td colspan="5"></td></tr>
-      ${row('ค่าน้ำประปา', `${d.wCur}-${d.wPrev} &nbsp; = ${units(d.wu, d.wMin)} * ${d.wRate} บาท`, d.water, true)}
-      ${row('ค่าไฟฟ้า', `${d.eCur}-${d.ePrev} &nbsp; = ${units(d.eu, d.eMin)} * ${d.eRate} บาท`, d.elec, true)}
-      <tr class="sp"><td colspan="5"></td></tr>
-      ${d.items.map(o => row('- ' + esc(o.name), '', o.amount, true)).join('')}
-      <tr class="sp"><td colspan="5"></td></tr>
-      <tr class="tot"><td colspan="2">${d.refund >= 0 ? 'คงเหลือคืนเงินประกันทั้งสิ้น' : 'ผู้เช่าต้องชำระเพิ่มทั้งสิ้น'}</td><td class="c">=</td><td class="n"><u>${money(Math.abs(d.refund))}</u></td><td><u>บาท</u></td></tr>
-    </table>
-    <div class="sign"><span>ผู้เช่า ..................................</span><span>ผู้จัดทำ ..................................</span></div>
-  </div>`;
 }
 
 // ข้อมูลผู้เช่า + ประวัติบิลทั้งหมดของคนนี้

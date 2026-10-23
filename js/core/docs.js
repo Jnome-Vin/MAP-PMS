@@ -155,7 +155,65 @@ export async function docPage(b, opts) {
 
 export async function printDocs(list, opts = {}) {
   if (!list.length) return false;
-  const pages = await Promise.all(list.map(b => docHtml(b, typeof opts === 'function' ? opts(b) : opts)));
+  return printA4(await Promise.all(list.map(b => docHtml(b, typeof opts === 'function' ? opts(b) : opts))));
+}
+
+// ---------- ใบคืนเงินประกัน (ตอนย้ายออก) — รูปแบบเดียวกับใบแจ้งหนี้ ----------
+// เลขที่ RF + ปี พ.ศ. 2 หลัก + เดือน + ลำดับในเดือน เช่น RF6910-1 (ตามเดือนที่ย้ายออก)
+export function nextRefundNo(date, tenants) {
+  const [y, m] = String(date).split('-').map(Number);
+  const prefix = `RF${String((y + 543) % 100).padStart(2, '0')}${String(m).padStart(2, '0')}-`;
+  const max = tenants.map(t => t.moveOutDoc?.no).filter(n => n && n.startsWith(prefix)).reduce((a, n) => Math.max(a, Number(n.slice(prefix.length)) || 0), 0);
+  return prefix + (max + 1);
+}
+export async function refundDocHtml(t) {
+  const d = t.moveOutDoc;
+  if (!d) return '<div class="doc"><p>ไม่มีข้อมูลเอกสารคืนเงิน</p></div>';
+  const [logo, sign] = await Promise.all([asset('logo'), asset('sign')]);
+  const now = new Date(), dots = '.'.repeat(44), back = d.refund >= 0;
+  const [y, m, dd] = String(d.date || '').split('-').map(Number);
+  const red = s => `<span style="color:#c00">${s}</span>`;
+  const rows = [];
+  if (d.wu != null) rows.push(['ค่าน้ำประปา', `( ${d.wPrev} - ${d.wCur} )${d.wMin != null ? ' ขั้นต่ำ' : ''}`, d.wMin ?? d.wu, d.wRate, d.water]);
+  if (d.eu != null) rows.push(['ค่าไฟฟ้า', `( ${d.ePrev} - ${d.eCur} )${d.eMin != null ? ' ขั้นต่ำ' : ''}`, d.eMin ?? d.eu, d.eRate, d.elec]);
+  (d.items || []).forEach(o => rows.push([o.name || 'รายการหัก', '', null, null, o.amount]));
+  const how = !back ? 'ผู้เช่าต้องชำระเพิ่มตามยอดข้างต้น'
+    : d.refundMethod === 'transfer' ? `คืนเงินโดย: โอนเข้าบัญชี ${esc(d.bank || '')} เลขที่ ${esc(d.acctNo || '')}${d.acctName ? ` ชื่อบัญชี ${esc(d.acctName)}` : ''}`
+    : d.refundMethod === 'cash' ? 'คืนเงินโดย: เงินสด'
+    : 'คืนเงินโดย: ......................................................................';
+  return `<div class="doc">
+  <table class="lay"><tr>
+    <td>${logo ? `<img class="logo" src="${logo}" alt="">` : `<div class="brand">${esc(M.property().nameEn || M.property().name)}</div>`}</td>
+    <td style="width:250px;padding-top:12px"><div class="title">ใบคืนเงินประกัน</div><div class="no">NO. ${esc(d.no || '-')}</div></td>
+  </tr></table>
+  <div class="rule"></div>
+  <table class="info">
+    <tr><td class="k">หมายเลขห้อง :</td><td>${esc(t.room)}</td></tr>
+    <tr><td class="k">ชื่อ-นามสกุล :</td><td>${esc(t.name || '')}</td></tr>
+    <tr><td class="k">วันที่ย้ายออก :</td><td>${y ? `${dd}/${m}/${y + 543}` : '-'}</td></tr>
+    <tr><td class="k">วันเวลาที่พิมพ์ :</td><td>${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}<span style="display:inline-block;width:80px"></span>${now.toTimeString().slice(0, 8)}</td></tr>
+  </table>
+  <table class="items"><thead><tr><th class="f">รายการ</th><th style="width:105px">จำนวนหน่วย</th><th style="width:110px">ราคาต่อหน่วย</th><th style="width:120px">จำนวนเงิน</th></tr></thead><tbody>
+    <tr class="sp"><td class="f"></td><td></td><td></td><td></td></tr>
+    <tr><td class="f"><b>เงินประกัน</b></td><td></td><td></td><td class="n"><b>${fmt2(d.deposit)}</b></td></tr>
+    <tr><td class="f" style="padding-top:12px"><u>หัก</u></td><td></td><td></td><td></td></tr>
+    ${rows.map(r => `<tr><td class="f"><span style="display:inline-block;min-width:160px">&nbsp;&nbsp;- ${esc(r[0])}</span>${esc(r[1])}</td><td class="c">${r[2] ?? ''}</td><td class="n">${r[3] != null ? fmt2(r[3]) : ''}</td><td class="n">${red('-' + fmt2(r[4]))}</td></tr>`).join('')}
+    <tr><td class="f" style="padding-top:10px">รวมรายการหัก</td><td></td><td></td><td class="n" style="padding-top:10px">${red('-' + fmt2(d.totalDed))}</td></tr>
+    <tr class="sp"><td class="f"></td><td></td><td></td><td></td></tr>
+    <tr class="tot"><td class="f" style="text-align:center" colspan="2">( ${bahtText(Math.abs(d.refund))} )</td><td class="c" style="white-space:nowrap">${back ? 'คืนเงินประกัน' : 'ชำระเพิ่ม'}</td><td class="n">${back ? fmt2(d.refund) : red(fmt2(-d.refund))}</td></tr>
+  </tbody></table>
+  <p class="note">ผู้เช่าได้ตรวจสอบรายการและเลขมิเตอร์ข้างต้นแล้ว<br>${how}</p>
+  <table class="sign">
+    <tr class="img"><td class="lbl"></td><td class="dots"></td><td class="gap"></td><td class="lbl"></td><td class="dots">${sign ? `<img class="sig" src="${sign}" alt="">` : ''}</td></tr>
+    <tr><td class="lbl">ผู้เช่า</td><td class="dots">${dots}</td><td class="gap"></td><td class="lbl">ผู้จัดทำ</td><td class="dots">${dots}</td></tr>
+  </table>
+  <div class="foot"></div>
+</div>`;
+}
+export async function printRefundDoc(t) { return printA4([await refundDocHtml(t)]); }
+
+// พิมพ์เอกสารชุดหนึ่ง (แต่ละหน้าเป็น HTML ของ .doc)
+function printA4(pages) {
   // 1 ใบ = 1 แผ่น A4 พอดี: ขอบกระดาษ 0 (ไม่มีหัว/ท้ายกระดาษของเบราว์เซอร์) แล้วจัดขอบเองในกรอบ .a4
   const area = $('#print-area');
   area.innerHTML = `<style>${CSS}@page{size:A4;margin:0}</style>` + pages.map(h => `<div class="a4">${h}</div>`).join('');

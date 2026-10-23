@@ -246,18 +246,6 @@ svg.park{width:100%;height:auto;background:#fbfcfd;border:1px solid var(--line);
 .bill .tot td{font-weight:700;font-size:17px;border-bottom:0;padding-top:10px}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 
-/* เอกสารคืนเงินประกัน */
-.refund{font-family:"IBM Plex Sans Thai","Sarabun",sans-serif;max-width:680px;margin:0 auto;font-size:15px;color:#111}
-.refund h3{text-align:center;text-decoration:underline;margin:0 0 6px}
-.refund .date{text-align:right;margin:0 0 18px}
-.refund table{width:100%;border-collapse:collapse}
-.refund td{padding:6px 4px;vertical-align:top}
-.refund td.c{text-align:center;width:30px}.refund td.n{text-align:right;width:110px}
-.refund tr.sp td{height:8px;padding:0}
-.refund tr.tot td{padding-top:14px}
-.refund tr.tot u{text-decoration:underline double}
-.refund .sign{display:flex;justify-content:space-around;margin-top:48px}
-
 #print-area{display:none}
 @media print{
   body>*:not(#print-area){display:none!important}
