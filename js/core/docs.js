@@ -94,7 +94,7 @@ export async function docHtml(b, { type = 'invoice', lang = M.langOf(b), payment
     : `<p class="note">${esc(lang === 'en' ? (p.billNoteEn || p.billNote || '') : (p.billNote || ''))}</p>`}
   <table class="sign">
     <tr class="img"><td class="lbl"></td><td class="dots"></td><td class="gap"></td><td class="lbl"></td>
-      <td class="dots">${type === 'invoice' && sign ? `<img class="sig" src="${sign}" alt="">` : ''}</td></tr>
+      <td class="dots">${sign ? `<img class="sig" src="${sign}" alt="">` : ''}</td></tr>
     <tr><td class="lbl">${t.tenant}</td><td class="dots">${dots}</td><td class="gap"></td>
       <td class="lbl">${type === 'receipt' ? t.receiver : t.preparer}</td><td class="dots">${dots}</td></tr>
   </table>
