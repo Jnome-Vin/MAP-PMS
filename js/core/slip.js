@@ -56,14 +56,17 @@ const money = s => Number(String(s).replace(/,/g, ''));
 // เดือนย่อแบบทนต่อ OCR: พยัญชนะต้น + พยัญชนะท้าย (OCR มักใส่จุด/วรรณยุกต์ผิด เช่น "ต.ุค,")
 const ABBR = { 'มค': 1, 'กพ': 2, 'มีค': 3, 'เมย': 4, 'พค': 5, 'มิย': 6, 'กค': 7, 'สค': 8, 'กย': 9, 'ตค': 10, 'พย': 11, 'ธค': 12 };
 export function parseSlipText(raw) {
-  const t = String(raw || '').replace(/ /g, ' ').replace(/ํา/g, 'ำ').replace(/[ \t]+/g, ' ');
+  const t = String(raw || '').replace(/ /g, ' ').replace(/ํา/g, 'ำ').replace(/[ \t]+/g, ' ').replace(/(\d),\s+(\d{3})/g, '$1,$2');
   const r = { amount: 0, date: '', time: '', reference: '' };
 
   // ยอดเงิน: หลังคำว่า จำนวน/จำนวนเงิน/Amount หรือ ตัวเลขที่ตามด้วย บาท/THB
   const am = t.match(/(?:จำนวน(?:เงิน)?|ยอด(?:เงิน|โอน)?|amount)\s*[:：]?\s*(?:฿|THB)?\s*([\d,]+\.\d{2})/i)
     || t.match(/([\d,]+\.\d{2})\s*(?:บาท|THB|฿)/i) || t.match(/(?:฿|THB)\s*([\d,]+\.\d{2})/i);
   if (am) r.amount = money(am[1]);
-  else { const all = [...t.matchAll(/\b\d{1,3}(?:,\d{3})*\.\d{2}\b/g)].map(x => money(x[0])).filter(x => x > 0); if (all.length) r.amount = Math.max(...all); }
+  else {   // ไม่มีคำกำกับยอด: ใช้ได้เฉพาะเมื่อมีตัวเลขเงินค่าเดียว ถ้ามีหลายค่าห้ามเดา ให้ผู้ใช้กรอกเอง
+    const all = new Set([...t.matchAll(/(?<![\d.,])\d[\d,]*\.\d{2}(?!\d)/g)].map(x => money(x[0])).filter(x => x > 0));
+    if (all.size === 1) r.amount = [...all][0];
+  }
 
   // วันที่: 21 ต.ค. 69 / 21 ตุลาคม 2569 / 21/10/2569 / 21 Oct 2026
   let d = t.match(/(\d{1,2})\s*(ม\.ค|ก\.พ|มี\.ค|เม\.ย|พ\.ค|มิ\.ย|ก\.ค|ส\.ค|ก\.ย|ต\.ค|พ\.ย|ธ\.ค)\.?\s*(\d{2,4})/)
@@ -109,7 +112,7 @@ export function verifySlip(read, pay, window) {
       : { level: 'bad', key: 'amount', text: `ยอดในสลิป ฿${f(read.amount)} ไม่ตรงกับยอดที่บันทึก ฿${f(pay.amount)} (ต่าง ฿${f(Math.abs(diff))})` });
     const exp = window.expected ?? window.balance, d2 = Math.round((read.amount - exp) * 100) / 100;
     if (exp > 0) out.push(d2 === 0 ? { level: 'ok', key: 'due', text: `ยอดในสลิปตรงกับยอดที่ต้องชำระ ฿${f(exp)}` }
-      : { level: 'bad', key: 'due', text: `ยอดในสลิป ฿${f(read.amount)} ไม่ตรงกับยอดที่ต้องชำระ ฿${f(exp)} — ${d2 < 0 ? 'ชำระขาด' : 'ชำระเกิน'} ฿${f(Math.abs(d2))}` });
+      : { level: window.handled ? 'warn' : 'bad', key: 'due', text: `ยอดในสลิป ฿${f(read.amount)} ไม่ตรงกับยอดที่ต้องชำระ ฿${f(exp)} — ${d2 < 0 ? 'ชำระไม่ครบ' : 'โอนเกินมา'} ฿${f(Math.abs(d2))}${window.handled ? ' (ระบุวิธีจัดการแล้ว)' : ''}` });
   } else out.push({ level: 'warn', key: 'amount', text: 'อ่านยอดจากสลิปไม่ได้ — กรุณาตรวจด้วยตา' });
 
   if (read.date) {

@@ -100,6 +100,20 @@ export async function openPayment(b, done) {
     <div class="card" style="margin-top:12px;padding:12px">
       <div class="toolbar" style="justify-content:space-between"><span>ยอดที่ต้องชำระทั้งหมด</span><b id="py-due"></b></div>
       <div class="toolbar" style="justify-content:space-between;margin-top:4px;font-size:17px"><span id="py-lbl"></span><b id="py-left"></b></div></div>
+    <div class="card" id="py-short" style="margin-top:10px;padding:10px 12px" hidden>
+      <b style="color:var(--bad)">⚠️ ยอดชำระไม่ครบ — ขาด <span id="py-shortamt"></span></b>
+      <div style="margin:6px 0 4px">มีหัก ณ ที่จ่ายหรือไม่?</div>
+      <label style="display:block"><input type="radio" name="py-sa" value="wht"> มี — หัก ณ ที่จ่าย</label>
+      <div id="py-whtbox" class="toolbar" style="margin:4px 0 6px 22px" hidden><span>จำนวน</span><input class="input" id="py-wht" type="number" min="0" step="0.01" placeholder="บาท" style="width:130px;text-align:right"><span>บาท</span><span id="py-whtmsg" class="note"></span></div>
+      <label style="display:block"><input type="radio" name="py-sa" value="none"> ไม่มี — บันทึกเป็นชำระบางส่วน และคงยอดค้างไว้</label></div>
+    <div class="card" id="py-over" style="margin-top:10px;padding:10px 12px" hidden>
+      <b style="color:var(--bad)">⚠️ <span id="py-overlbl"></span> <span id="py-overamt"></span></b>
+      <div style="margin:6px 0 4px">จะจัดการยอดที่เกินอย่างไร?</div>
+      <label style="display:block"><input type="radio" name="py-oa" value="transfer"> โอนเงินคืน</label>
+      <label style="display:block"><input type="radio" name="py-oa" value="cash"> คืนเป็นเงินสด</label>
+      <label style="display:block"><input type="radio" name="py-oa" value="other"> เป็นค่าใช้จ่ายอื่นๆ ที่จ่ายเพิ่มเข้ามา</label>
+      <input class="input" id="py-oname" placeholder="ชื่อค่าใช้จ่าย เช่น ค่ากุญแจหาย" style="width:100%;margin:4px 0" hidden>
+      <input class="input" id="py-onote" placeholder="หมายเหตุ (ไม่บังคับ)" style="width:100%;margin-top:4px"></div>
     <div id="py-verify"></div>
     <div class="err" id="py-err"></div>
     <div class="form-acts"><button class="btn" id="py-x">ยกเลิก</button>
@@ -107,15 +121,30 @@ export async function openPayment(b, done) {
       <button class="btn" id="py-ok">บันทึกรับชำระ</button><button class="btn pri" id="py-print">บันทึก + พิมพ์ใบเสร็จ</button></div>`, { wide: true });
   const $b = s => box.querySelector(s), num = s => Number($b(s).value) || 0;
   const due = () => Math.round((c.balance + num('#py-fine') + extras.reduce((a, o) => a + (Number(o.amount) || 0), 0)) * 100) / 100;
-  let amtTouched = false;
+  const r2 = n => Math.round(n * 100) / 100;
+  let method = METHODS[0], amtTouched = false, shortAns = '', overAct = '';
+  const whtAmt = () => shortAns === 'wht' ? num('#py-wht') : 0;
+  const shortBy = () => $b('#py-amt').value === '' ? 0 : Math.max(0, r2(due() - num('#py-amt')));   // ยอดรับน้อยกว่าที่ต้องชำระ
+  const overBy = () => Math.max(0, r2(num('#py-amt') - due()));                                      // ยอดรับมากกว่าที่ต้องชำระ
   let calc = () => {
     const d = due(); if (!amtTouched) $b('#py-amt').value = d;
-    const left = Math.round((d - num('#py-amt')) * 100) / 100;
+    $b('#py-err').textContent = '';
+    const empty = $b('#py-amt').value === '', short = shortBy(), over = overBy(), wht = whtAmt();
+    const left = r2(d - num('#py-amt') - wht), viaCash = method === 'เงินสด';
     $b('#py-due').textContent = '฿' + fmt(d);
-    $b('#py-lbl').textContent = left > 0 ? 'ชำระบางส่วน — คงเหลือค้างชำระ' : left < 0 ? 'ชำระเกิน' : 'ชำระครบ';
-    $b('#py-left').textContent = left ? '฿' + fmt(Math.abs(left)) : '✔';
-    $b('#py-left').style.color = left > 0 ? 'var(--warn)' : left < 0 ? 'var(--bad)' : 'var(--ok)';
+    // ห้ามแจ้งว่าชำระครบเมื่อยอดไม่ตรง หรือยังไม่รู้ยอดที่รับจริง
+    $b('#py-lbl').textContent = empty ? 'ยังไม่ได้กรอกยอดเงินที่รับ' : left > 0 ? 'ยอดชำระไม่ครบ — ขาด' : over ? (viaCash ? 'ยอดรับเกินมา' : 'ยอดโอนเกินมา')
+      : left < 0 ? 'หัก ณ ที่จ่ายมากกว่าส่วนต่าง' : wht ? `ชำระครบ (รวมหัก ณ ที่จ่าย ฿${fmt(wht)})` : 'ชำระครบ';
+    $b('#py-left').textContent = empty ? '-' : left ? '฿' + fmt(Math.abs(left)) : '✔';
+    $b('#py-left').style.color = empty || left ? 'var(--bad)' : 'var(--ok)';
+    $b('#py-short').hidden = !short; $b('#py-over').hidden = !over;
+    $b('#py-shortamt').textContent = '฿' + fmt(short); $b('#py-overamt').textContent = '฿' + fmt(over);
+    $b('#py-overlbl').textContent = viaCash ? 'ยอดรับเกินมา' : 'ยอดโอนเกินมา';
+    $b('#py-whtbox').hidden = shortAns !== 'wht'; $b('#py-oname').hidden = overAct !== 'other';
+    $b('#py-whtmsg').textContent = shortAns !== 'wht' || !wht ? '' : left > 0 ? `ยังขาดอีก ฿${fmt(left)}` : left < 0 ? 'มากกว่าส่วนต่าง' : 'พอดีกับส่วนต่าง';
   };
+  // ส่วนต่างถูกระบุวิธีจัดการแล้วหรือยัง
+  const diffHandled = () => shortBy() ? (shortAns === 'none' || (shortAns === 'wht' && whtAmt() > 0 && whtAmt() <= shortBy())) : overBy() ? !!overAct : false;
   const drawExtras = () => {
     $b('#py-extras').innerHTML = extras.map((o, i) => `<div class="toolbar" style="margin-bottom:6px">
       <input class="input" data-x="${i}" data-k="name" value="${esc(o.name)}" placeholder="รายการ เช่น ค่ากุญแจหาย" style="flex:1;min-width:160px">
@@ -130,7 +159,6 @@ export async function openPayment(b, done) {
 
   // ช่องทางชำระ: เงินสด → แสดงช่องรับเงินมา/เงินทอน · หักเงินประกัน → แสดงยอดประกันคงเหลือ · ทั้งสองแบบซ่อนส่วนสลิป
   const tenant = db.get('tenants', b.tenantId) || M.tenantOf(b.room), depLeft = M.depositLeft(tenant);
-  let method = METHODS[0];
   const setMethod = m => {
     method = m;
     box.querySelectorAll('#py-methods [data-m]').forEach(x => x.classList.toggle('on', x.dataset.m === m));
@@ -164,12 +192,15 @@ export async function openPayment(b, done) {
   const renderVerify = () => {
     const acked = !!$b('#py-ack')?.checked;   // คงสถานะติ๊กยืนยันไว้เมื่อวาดใหม่
     if (!slipRead) { checks = []; $b('#py-verify').innerHTML = ''; return; }
-    checks = verifySlip(slipRead, { amount: num('#py-amt'), date: $b('#py-date').value }, { ...M.payWindow(b), expected: due() });
+    checks = verifySlip(slipRead, { amount: num('#py-amt'), date: $b('#py-date').value }, { ...M.payWindow(b), expected: r2(due() - whtAmt()), handled: diffHandled() });
     const bad = slipIssues(checks).length;
     $b('#py-verify').innerHTML = `<div class="card" style="margin-top:10px;padding:10px 12px"><b>ผลตรวจสลิป</b>${verifyHtml(checks)}
       ${bad ? `<label style="display:flex;gap:8px;align-items:center;margin-top:6px;color:var(--bad)"><input type="checkbox" id="py-ack" ${acked ? 'checked' : ''}> ตรวจสอบแล้ว ยืนยันบันทึกแม้ผลตรวจไม่ผ่าน</label>` : ''}</div>`;
   };
-  ['#py-amt', '#py-date', '#py-fine'].forEach(s => $b(s).addEventListener('input', renderVerify));
+  ['#py-amt', '#py-date', '#py-fine', '#py-wht'].forEach(s => $b(s).addEventListener('input', renderVerify));
+  $b('#py-wht').addEventListener('input', () => { calc(); renderVerify(); });
+  box.querySelectorAll('[name="py-sa"]').forEach(x => x.onchange = () => { shortAns = x.value; calc(); renderVerify(); if (shortAns === 'wht') $b('#py-wht').focus(); });
+  box.querySelectorAll('[name="py-oa"]').forEach(x => x.onchange = () => { overAct = x.value; calc(); renderVerify(); });
   const showDup = () => dup && msg(`⛔ <b>สลิปนี้เคยใช้แล้ว</b> — ห้อง ${dup.bill.room} บิล${periodLabel(dup.bill.period, true)} รับเมื่อ ${thDate(dup.payment.date)} ฿${fmt(dup.payment.amount)} (${esc(dup.payment.receiptNo || '')})`);
   const applyRead = (r, source) => {
     if (r.amount > 0) { $b('#py-amt').value = r.amount; amtTouched = true; }
@@ -180,11 +211,12 @@ export async function openPayment(b, done) {
     slipRead = { amount: r.amount, date: r.date, time: r.time, ref: r.reference, source };
     renderVerify();
     if (dup) return showDup();
-    msg(`✅ ${source}: ${r.amount > 0 ? `<b>฿${fmt(r.amount)}</b>` : '<span style="color:var(--warn)">อ่านยอดไม่ได้ กรุณากรอกเอง</span>'}${r.date ? ' · ' + esc(r.date) : ''} ${esc(r.time || '')}${slipRef ? ' · อ้างอิง ' + esc(slipRef) : ''} — <b>กรุณาตรวจทานก่อนบันทึก</b>`);
+    msg(`✅ ${source}: ${r.amount > 0 ? `<b>฿${fmt(r.amount)}</b>` : '<span style="color:var(--bad)">อ่านยอดไม่ได้ กรุณากรอกยอดตามสลิป</span>'}${r.date ? ' · ' + esc(r.date) : ''} ${esc(r.time || '')}${slipRef ? ' · อ้างอิง ' + esc(slipRef) : ''} — <b>กรุณาตรวจทานก่อนบันทึก</b>`);
   };
   const onSlip = async e => {
     const f = e.target.files[0]; if (!f) return;
     slip = await compress(await fileToDataUrl(f), 1600); ai = null; slipRef = ''; dup = null; slipRead = null; renderVerify();
+    $b('#py-amt').value = ''; amtTouched = true; calc();   // แนบสลิปแล้วล้างยอดที่เติมไว้ ห้ามถือว่ายอดบิลคือยอดในสลิป
     $b('#py-slipview').innerHTML = `<img class="thumb" style="margin:0 auto;max-height:260px;width:auto" src="${slip}" alt="สลิป">`;
     $b('#py-ocr').disabled = false; if ($b('#py-ai')) $b('#py-ai').disabled = false;
     msg('🔍 กำลังอ่าน QR บนสลิป…');
@@ -230,6 +262,12 @@ export async function openPayment(b, done) {
   const commit = async print => {
     const amt = num('#py-amt');
     if (!(amt > 0)) return $b('#py-err').textContent = 'กรุณาใส่จำนวนเงินที่รับ';
+    const dueNow = due(), short = shortBy(), over = overBy(), wht = whtAmt();
+    if (short && !shortAns) return $b('#py-err').textContent = `ยอดชำระไม่ครบ ขาด ฿${fmt(short)} — กรุณาระบุว่ามีหัก ณ ที่จ่ายหรือไม่`;
+    if (short && shortAns === 'wht' && !(wht > 0)) return $b('#py-err').textContent = 'กรุณากรอกจำนวนเงินหัก ณ ที่จ่าย';
+    if (short && wht > short) return $b('#py-err').textContent = `หัก ณ ที่จ่ายมากกว่าส่วนต่าง ฿${fmt(short)}`;
+    if (over && !overAct) return $b('#py-err').textContent = `ยอดเกินมา ฿${fmt(over)} — กรุณาเลือกวิธีจัดการยอดที่เกิน`;
+    if (over && overAct === 'other' && !$b('#py-oname').value.trim()) return $b('#py-err').textContent = 'กรุณาใส่ชื่อค่าใช้จ่ายอื่นๆ';
     if (extras.some(o => (Number(o.amount) || 0) && !o.name.trim())) return $b('#py-err').textContent = 'กรุณาใส่ชื่อรายการอื่นให้ครบ';
     if (method === M.DEPOSIT_METHOD && amt > depLeft) return $b('#py-err').textContent = `เงินประกันคงเหลือไม่พอ (ใช้ได้ ฿${fmt(depLeft)})`;
     if (slip && (dup = findDuplicate({ ref: slipRef, hash: slipHash }))) { showDup(); return $b('#py-err').textContent = 'สลิปนี้เคยใช้รับชำระแล้ว บันทึกซ้ำไม่ได้'; }
@@ -239,15 +277,22 @@ export async function openPayment(b, done) {
     const add = [];
     if (num('#py-fine') > 0) add.push({ name: lateDays ? `ค่าปรับชำระล่าช้า (${lateDays} วัน)` : 'ค่าปรับ', qty: 1, price: num('#py-fine'), amount: num('#py-fine') });
     for (const o of extras) if (Number(o.amount)) add.push({ name: o.name.trim(), qty: 1, price: Number(o.amount), amount: Number(o.amount) });
+    if (over && overAct === 'other') add.push({ name: $b('#py-oname').value.trim(), qty: 1, price: over, amount: over });
     let slipId = '';
     if (slip) {
       slipId = uid('slip-');
       await db.putPhoto({ id: slipId, dataUrl: slip, name: `สลิป-${b.room}-${b.period}-${$b('#py-date').value}.jpg`, billId: b.id, createdAt: new Date().toISOString() });
       await db.queue({ kind: 'photo', photoId: slipId, folder: 'slip' });
     }
-    const pay = { date: $b('#py-date').value, amount: amt, method, ref: $b('#py-ref').value.trim(), slipId, slipRef, slipHash, aiRead: !!ai,
+    // amount = ยอดที่ตัดบิล · ถ้าต้องคืนยอดเกิน เก็บยอดรับจริงใน received และวิธีจัดการใน overpay
+    const refund = over && overAct !== 'other';
+    const pay = { date: $b('#py-date').value, amount: refund ? dueNow : amt, method, ref: $b('#py-ref').value.trim(), slipId, slipRef, slipHash, aiRead: !!ai,
       slipRead: slipRead || null, slipCheck: checks.length ? { at: new Date().toISOString(), checks, acknowledged: !!$b('#py-ack')?.checked } : null,
       by: auth.current().email, receiptNo: M.nextInvoiceNo(b.period, 'R') };
+    if (wht) pay.wht = wht;
+    if (short && shortAns === 'none') pay.shortfall = short;
+    if (refund) pay.received = amt;
+    if (over) pay.overpay = { amount: over, action: overAct, name: $b('#py-oname').value.trim(), note: $b('#py-onote').value.trim() };
     const items = [...(nb.items || []), ...add], payments = [...(nb.payments || []), pay], cc = M.calcBill({ ...nb, items, payments });
     nb = await save({ ...nb, items, payments, status: cc.balance <= 0 ? 'paid' : 'issued', paidAt: cc.balance <= 0 ? pay.date : '' });
     closeModal();
@@ -262,6 +307,10 @@ export async function openPayment(b, done) {
 }
 
 // ---------- รายละเอียดการชำระ: ดูการโอน/สลิป · แก้ไข · ลบ · พิมพ์ใบเสร็จ ----------
+const OVER_TXT = { transfer: 'โอนเงินคืน', cash: 'คืนเป็นเงินสด', other: 'ค่าใช้จ่ายอื่นๆ ที่จ่ายเพิ่ม' };
+// ตรวจสลิปย้อนหลัง: เทียบกับยอดรับจริง และหักภาษีหัก ณ ที่จ่ายออกจากยอดที่ต้องโอน
+const slipArgs = (b, p, amount = p.received ?? p.amount) => [{ amount, date: p.date },
+  { ...M.payWindow(b, p), expected: M.payWindow(b, p).balance - (Number(p.wht) || 0), handled: !!(p.wht || p.shortfall || p.overpay) }];
 export function openPaymentDetail(b, done) {
   const c = M.calcBill(b), pays = b.payments || [];
   const box = openModal(`<h3>🧾 การชำระเงิน — ห้อง ${b.room}</h3>
@@ -277,6 +326,8 @@ export function openPaymentDetail(b, done) {
           <dt>ใบเสร็จ</dt><dd><b>${esc(p.receiptNo || '-')}</b></dd>
           <dt>วันที่ชำระ</dt><dd>${p.date ? thDate(p.date) : '-'}</dd>
           <dt>จำนวนเงิน</dt><dd><b>฿${fmt(p.amount)}</b></dd>
+          ${p.wht ? `<dt>หัก ณ ที่จ่าย</dt><dd>฿${fmt(p.wht)}</dd>` : ''}
+          ${p.overpay ? `<dt>ยอดเกินมา</dt><dd style="color:var(--bad)">฿${fmt(p.overpay.amount)} — ${esc(OVER_TXT[p.overpay.action] || '')}${p.overpay.name ? ': ' + esc(p.overpay.name) : ''}${p.overpay.note ? ' · ' + esc(p.overpay.note) : ''}</dd>` : ''}
           <dt>ช่องทาง</dt><dd>${METHOD_ICON[p.method] || ''} ${esc(p.method || p.note || '-')}</dd>
           <dt>เลขอ้างอิง</dt><dd>${esc(p.ref || p.slipRef || '-')}</dd>
           <dt>บันทึกโดย</dt><dd class="note">${esc(p.by || (b.legacy ? 'นำเข้าจากโปรแกรมเดิม' : '-'))}${p.aiRead ? ' · อ่านสลิปด้วย AI' : ''}${p.editedBy ? ` · แก้ไขโดย ${esc(p.editedBy)}` : ''}</dd>
@@ -286,7 +337,7 @@ export function openPaymentDetail(b, done) {
         <div style="width:200px;text-align:center" data-slip="${esc(p.slipId || '')}">${p.slipId ? '<span class="note">กำลังโหลดสลิป…</span>' : '<span class="note">ไม่มีสลิป</span>'}</div>
       </div>
       <div class="acts" style="margin-top:8px">${p.slipId ? `<button class="btn sm pri" data-verify="${i}">🔍 ตรวจสลิป</button>` : ''}
-        ${p.slipRead?.amount > 0 && p.slipRead.amount !== p.amount ? `<button class="btn sm" data-useslip="${i}">ใช้ยอดตามสลิป ฿${fmt(p.slipRead.amount)}</button>` : ''}
+        ${p.slipRead?.amount > 0 && p.slipRead.amount !== (p.received ?? p.amount) ?`<button class="btn sm" data-useslip="${i}">ใช้ยอดตามสลิป ฿${fmt(p.slipRead.amount)}</button>` : ''}
         <button class="btn sm" data-edit="${i}">✏️ แก้ไข</button><button class="btn sm" data-rc="${i}">🖨️ พิมพ์ใบเสร็จ</button>
         ${auth.can('data.delete') ? `<button class="btn sm danger" data-del="${i}">ลบรายการนี้</button>` : ''}</div>
       <div data-form="${i}"></div></div>`).join('') || '<p class="note">ยังไม่มีการชำระ</p>'}
@@ -313,7 +364,7 @@ export function openPaymentDetail(b, done) {
       const text = await ocrLocal(photo.dataUrl, pc => { out.textContent = `🔍 กำลังอ่านสลิป… ${pc}%`; });
       const r = parseSlipText(text);
       const read = { amount: r.amount, date: r.date, time: r.time, ref: r.reference, source: 'ตรวจย้อนหลัง (ในเครื่อง)' };
-      const checks = verifySlip(read, { amount: p.amount, date: p.date }, M.payWindow(b, p));
+      const checks = verifySlip(read, ...slipArgs(b, p));
       savePays(pays.map((q, k) => k === i ? { ...q, slipRead: read, slipCheck: { at: new Date().toISOString(), checks } } : q),
         slipIssues(checks).length ? '⛔ ตรวจสลิปแล้ว: พบรายการไม่ตรง' : '✅ ตรวจสลิปแล้ว: ผ่าน');
     } catch (e) { out.textContent = 'ตรวจสลิปไม่สำเร็จ: ' + e.message; x.disabled = false; }
@@ -321,8 +372,9 @@ export function openPaymentDetail(b, done) {
   box.querySelectorAll('[data-useslip]').forEach(x => x.onclick = async () => {
     const i = +x.dataset.useslip, p = pays[i];
     if (!await confirmBox(`แก้ยอดรับชำระ ${p.receiptNo || ''} จาก ฿${fmt(p.amount)} เป็น ฿${fmt(p.slipRead.amount)} ตามสลิป?`, 'แก้ยอด')) return openPaymentDetail(b, done);
-    const np = { ...p, amount: p.slipRead.amount, editedBy: auth.current().email, editedAt: new Date().toISOString() };
-    np.slipCheck = { at: new Date().toISOString(), checks: verifySlip(p.slipRead, { amount: np.amount, date: np.date }, M.payWindow(b, p)) };
+    const { received, overpay, ...rest } = p;
+    const np = { ...rest, amount: p.slipRead.amount, editedBy: auth.current().email, editedAt: new Date().toISOString() };
+    np.slipCheck = { at: new Date().toISOString(), checks: verifySlip(p.slipRead, { amount: np.amount, date: np.date }, slipArgs(b, p)[1]) };
     savePays(pays.map((q, k) => k === i ? np : q), 'แก้ยอดตามสลิปแล้ว');
   });
   box.querySelectorAll('[data-del]').forEach(x => x.onclick = async () => {
@@ -351,6 +403,7 @@ export function openPaymentDetail(b, done) {
         if (Number(v('amount')) > left) return toast(`เงินประกันคงเหลือไม่พอ (ใช้ได้ ฿${fmt(left)})`, 4000);
       }
       const np = { ...p, date: v('date'), amount: Number(v('amount')), method: v('method'), ref: v('ref').trim(), editedBy: auth.current().email, editedAt: new Date().toISOString() };
+      if (np.amount !== p.amount) { delete np.received; delete np.overpay; }   // แก้ยอดแล้ว ข้อมูลยอดเกินเดิมไม่ใช้อีก
       if (newSlip) {
         const hash = await imageHash(newSlip), d = findDuplicate({ hash });
         if (d && d.payment !== p) return toast(`สลิปนี้เคยใช้แล้วที่ห้อง ${d.bill.room} (${d.payment.receiptNo || ''})`, 4000);

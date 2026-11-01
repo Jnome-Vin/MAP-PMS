@@ -86,7 +86,8 @@ export async function docHtml(b, { type = 'invoice', lang = M.langOf(b), payment
     <tr class="sp"><td class="f"></td><td></td><td></td><td></td></tr>
     ${lines.map(l => `<tr><td class="f"><span style="display:inline-block;min-width:110px">${esc(l.label)}</span>${esc(l.sub || '')}</td><td class="c">${l.qty ?? ''}</td><td class="n">${l.price != null ? fmt2(l.price) : ''}</td><td class="n">${fmt2(l.amount)}</td></tr>`).join('')}
     <tr class="sp"><td class="f"></td><td></td><td></td><td></td></tr>
-    ${type === 'receipt' && c.paid !== c.total ? `<tr class="tot"><td class="f" style="text-align:center" colspan="2"></td><td class="c">${t.total}</td><td class="n">${fmt2(c.total)}</td></tr>` : ''}
+    ${type === 'receipt' && (c.paid !== c.total || payment?.wht) ? `<tr class="tot"><td class="f" style="text-align:center" colspan="2"></td><td class="c">${t.total}</td><td class="n">${fmt2(c.total)}</td></tr>` : ''}
+    ${type === 'receipt' && payment?.wht ? `<tr class="tot"><td class="f" style="text-align:center" colspan="2"></td><td class="c">${lang === 'en' ? 'Withholding tax' : 'หัก ณ ที่จ่าย'}</td><td class="n">${fmt2(payment.wht)}</td></tr>` : ''}
     <tr class="tot"><td class="f" style="text-align:center" colspan="2">( ${lang === 'en' ? englishAmount(amount) : bahtText(amount)} )</td><td class="c">${type === 'receipt' ? t.paid : t.total}</td><td class="n">${fmt2(amount)}</td></tr>
   </tbody></table>
   ${type === 'receipt' ? `<p class="stamp">✔ ${t.paid} ${thDate(payment?.date || b.paidAt)}${c.balance > 0 ? ` · ${t.balance} ${fmt2(c.balance)}` : ''}</p>`

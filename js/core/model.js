@@ -65,7 +65,7 @@ export function calcBill(b) {
   const items = (b.items || b.others || []).map(o => ({ ...o, amount: o.qty != null && o.price != null && !b.legacy ? o.qty * o.price : Number(o.amount) || 0 }));
   const other = items.reduce((a, o) => a + o.amount, 0);
   const total = round((Number(b.rent) || 0) + water + elec + (Number(b.fridge) || 0) + (Number(b.parking) || 0) + (Number(b.phone) || 0) + other);
-  const paid = round((b.payments || []).reduce((a, p) => a + (Number(p.amount) || 0), 0));
+  const paid = round((b.payments || []).reduce((a, p) => a + (Number(p.amount) || 0) + (Number(p.wht) || 0), 0));   // ภาษีหัก ณ ที่จ่ายถือเป็นยอดที่ชำระแล้ว
   return { wu, eu, water: round(water), elec: round(elec), items, other, total, paid, balance: round(total - paid), ready: wu != null && eu != null,
     wMin: !legacyW && wx.min, eMin: !legacyE && ex.min, wBilled: wx.billed, eBilled: ex.billed };
 }
