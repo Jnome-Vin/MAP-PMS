@@ -19,7 +19,7 @@ nav.side{background:var(--nav);color:#dce8f2;padding:14px 12px;position:sticky;t
 nav.side h1{font-size:21px;margin:0 8px 2px;color:#fff;white-space:nowrap}
 nav.side .sub{font-size:13px;margin:0 8px 12px;opacity:.7;white-space:nowrap}
 nav.side .items{display:flex;flex-direction:column;gap:3px;flex:none}
-nav.side .brand{flex:none}
+nav.side .brand{flex:none;text-align:center}
 nav.side .me{flex:none}
 nav.side button{display:flex;gap:12px;align-items:center;width:100%;background:none;border:0;color:inherit;padding:9px 12px;border-radius:9px;cursor:pointer;text-align:left;font-size:17px;white-space:nowrap}
 nav.side button i{font-style:normal;font-size:20px;width:26px;text-align:center;flex:none}
@@ -43,9 +43,9 @@ nav.side .ah input{width:18px;height:18px;margin:0 4px;flex:none;accent-color:#f
 .app.autohide nav.side{position:fixed;left:0;top:0;bottom:0;width:72px;z-index:30;padding:14px 10px;transition:width .18s ease,box-shadow .18s}
 .app.autohide nav.side:hover{width:260px;box-shadow:6px 0 24px rgba(0,0,0,.25)}
 .app.autohide nav.side .side-logo{width:52px;height:52px;margin:0 0 12px;transition:all .18s}
-.app.autohide nav.side .side-logo img{width:52px;height:52px}
-.app.autohide nav.side:hover .side-logo{width:92px;height:92px;margin:0 8px 10px}
-.app.autohide nav.side:hover .side-logo img{width:92px;height:92px}
+.app.autohide nav.side .side-logo img{width:40px;height:40px;transition:all .18s}
+.app.autohide nav.side:hover .side-logo{width:132px;height:132px;margin:-4px auto 2px}
+.app.autohide nav.side:hover .side-logo img{width:96px;height:96px}
 .app.autohide nav.side .brand,.app.autohide nav.side .who{max-height:0;overflow:hidden;opacity:0;transition:opacity .15s}
 .app.autohide nav.side:hover .brand,.app.autohide nav.side:hover .who{max-height:120px;opacity:1}
 .app.autohide nav.side button{padding:11px 13px}
@@ -113,8 +113,10 @@ button.pill.pay-btn:hover{filter:brightness(.95);box-shadow:0 1px 4px rgba(0,0,0
 .auth h1{margin:0 0 4px;font-size:22px;text-align:center}
 .auth h1+.note{text-align:center}
 .auth-logo{display:block;width:170px;height:auto;margin:-8px auto 6px}
-.side-logo{flex:none;background:#fff;border-radius:12px;width:92px;height:92px;margin:0 8px 10px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.side-logo img{width:92px;height:92px;object-fit:contain}
+/* โลโก้เมนู: กึ่งกลางเหนือชื่ออาคาร · พื้นขาวรอบโลโก้ค่อยๆ จางจนใสกลืนกับแถบเมนู */
+.side-logo{flex:none;width:132px;height:132px;margin:-4px auto 2px;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle closest-side,#fff 0,#fff 58%,rgba(255,255,255,.55) 76%,rgba(255,255,255,0) 100%)}
+.side-logo img{width:96px;height:96px;object-fit:contain}
 .warn-ic{cursor:help}
 .rate-box{background:var(--brand-soft);border:1px solid #c6dcec;border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
 .rate-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
