@@ -86,6 +86,8 @@ function autoHide(v) {
   } catch { return false; }
 }
 
+// เมนูที่มีไอคอนรูปภาพ (assets/nav/<id>.png) — เมนูอื่นใช้อีโมจิจาก m.icon
+const NAV_IMG = new Set(['dashboard', 'floorplan', 'parking', 'billing', 'tenants', 'reports', 'users']);
 const visible = () => MODULES.filter(m => !m.perm || auth.can(m.perm));
 
 function renderShell() {
@@ -96,7 +98,7 @@ function renderShell() {
     <nav class="side">
       <div class="side-logo"><img src="assets/brand-logo.png" alt="Meechai Apartment"></div>
       <div class="brand"><h1>${esc(APP.name)}</h1><div class="sub">ระบบบริหารห้องพัก (PMS) · v${APP.version}</div></div>
-      <div class="items">${visible().map(m => `<button data-m="${m.id}" class="${m.id === currentId ? 'on' : ''}" title="${esc(m.title)}"><i>${m.icon}</i><span>${esc(m.title)}</span></button>`).join('')}</div>
+      <div class="items">${visible().map(m => `<button data-m="${m.id}" class="${m.id === currentId ? 'on' : ''}" title="${esc(m.title)}"><i class="${NAV_IMG.has(m.id) ? 'pic' : ''}">${NAV_IMG.has(m.id) ? `<img src="assets/nav/${m.id}.png" alt="">` : m.icon}</i><span>${esc(m.title)}</span></button>`).join('')}</div>
       <div class="me"><div class="who"><b>${esc(s.name || s.email)}</b><br>${auth.ROLES[s.role]}</div>
         <button data-pw title="เปลี่ยนรหัสผ่าน"><i>🔑</i><span>เปลี่ยนรหัสผ่าน</span></button><button data-out title="ออกจากระบบ"><i>⏻</i><span>ออกจากระบบ</span></button>
         <label class="ah" title="ซ่อนเมนูเหลือแค่ไอคอน เลื่อนเมาส์มาที่เมนูเพื่อขยาย"><input type="checkbox" data-autohide ${autoHide() ? 'checked' : ''}><span>ซ่อนเมนูอัตโนมัติ</span></label></div>

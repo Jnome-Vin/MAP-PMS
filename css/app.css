@@ -23,6 +23,12 @@ nav.side .brand{flex:none}
 nav.side .me{flex:none}
 nav.side button{display:flex;gap:12px;align-items:center;width:100%;background:none;border:0;color:inherit;padding:9px 12px;border-radius:9px;cursor:pointer;text-align:left;font-size:17px;white-space:nowrap}
 nav.side button i{font-style:normal;font-size:20px;width:26px;text-align:center;flex:none}
+/* เมนูหลัก: ไอคอนบนแผ่นขาวมุมมน (รูปภาพมองเห็นชัดบนแถบสีเข้ม) */
+nav.side .items{gap:4px}
+nav.side .items button{padding:5px 10px;min-height:48px}
+nav.side .items button i{width:38px;height:38px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+nav.side .items button i img{width:32px;height:32px;object-fit:contain;display:block}
+nav.side .items button.on i{box-shadow:0 0 0 1.5px var(--line)}
 nav.side button:hover{background:rgba(255,255,255,.08)}
 nav.side button.on{background:#fff;color:var(--nav);font-weight:600}
 nav.side .me{margin-top:auto;font-size:15px;line-height:1.5;padding:12px 4px 0;border-top:1px solid rgba(255,255,255,.15)}
@@ -43,6 +49,7 @@ nav.side .ah input{width:18px;height:18px;margin:0 4px;flex:none;accent-color:#f
 .app.autohide nav.side .brand,.app.autohide nav.side .who{max-height:0;overflow:hidden;opacity:0;transition:opacity .15s}
 .app.autohide nav.side:hover .brand,.app.autohide nav.side:hover .who{max-height:120px;opacity:1}
 .app.autohide nav.side button{padding:11px 13px}
+.app.autohide nav.side .items button{padding:5px 7px}
 .app.autohide nav.side button span,.app.autohide nav.side .ah span{opacity:0;transition:opacity .15s}
 .app.autohide nav.side:hover button span,.app.autohide nav.side:hover .ah span{opacity:1}
 main{padding:16px 24px 40px;min-width:0}
@@ -54,8 +61,10 @@ main{padding:16px 24px 40px;min-width:0}
 .top h2{margin:0;font-size:22px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
-.kpi .v{font-size:28px;font-weight:700}
-.kpi .l{color:var(--muted);font-size:13px}
+.kpi .v{font-size:28px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi .l{color:var(--muted);font-size:13px;line-height:1.45}
+/* ปุ่มการ์ด: ชิดบนทุกใบ — ตัวเลขอยู่ระดับเดียวกัน ข้อความเริ่มบรรทัดเดียวกัน (ปุ่มปกติจัดกลางแนวตั้ง) */
+button.kpi{display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:2px}
 button.kpi.click{font:inherit;color:inherit;text-align:left;cursor:pointer;transition:box-shadow .15s,border-color .15s}
 button.kpi.click:hover{border-color:var(--brand);box-shadow:0 2px 10px rgba(0,0,0,.08)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}

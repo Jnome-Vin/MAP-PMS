@@ -4,7 +4,7 @@ import * as M from './model.js';
 import { esc, fmt, bahtText, englishAmount, thDate } from './ui.js';
 import { printInFrame } from './printframe.js';
 
-const ASSETS = { logo: 'assets/logo.png', qr: 'assets/payment-qr.png', sign: 'assets/signature.png' };
+const ASSETS = { logo: 'assets/logo.png', qr: 'assets/payment-qr.png', sign: 'assets/signature.png', brand: 'assets/brand-logo.png' };
 const cache = {};
 // รูปเป็น dataURL เพื่อให้ฝังใน PDF ได้ และพิมพ์ได้ตอน offline
 export async function asset(key) {

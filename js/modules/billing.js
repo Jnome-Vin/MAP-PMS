@@ -6,6 +6,7 @@ import * as auth from '../core/auth.js';
 import { isServerMode } from '../core/config.js';
 import { docHtml, docCss, printDocs } from '../core/docs.js';
 import { printInFrame } from '../core/printframe.js';
+import { printIncomeSummary } from '../core/incomeReport.js';
 import { esc, fmt, fmt0, toast, openModal, closeModal, confirmBox, periodLabel, periodOf, shiftPeriod, thDate, uid } from '../core/ui.js';
 import * as api from '../core/api.js';
 import { compress, fileToDataUrl, photoThumb } from './tenants.js';
@@ -506,6 +507,7 @@ export default {
     <div class="toolbar" style="margin-bottom:12px">
       <button class="btn pri" id="issue" ${drafts.length ? '' : 'disabled'}>ออกใบแจ้งหนี้ ${drafts.length} ห้อง</button>
       <button class="btn" id="printall" ${issued.length ? '' : 'disabled'}>🖨️ พิมพ์ใบแจ้งหนี้ทั้งหมด</button>
+      <button class="btn" id="incsum" ${issued.length ? '' : 'disabled'}>🖨️ พิมพ์สรุปรายได้</button>
       <button class="btn line" id="lineall" ${issued.length || drafts.length ? '' : 'disabled'}>🖨️ พิมพ์ + ส่ง LINE ทุกห้อง</button>
       <button class="btn" id="form">📋 แบบฟอร์มจดมิเตอร์</button></div>
     <div class="kpis">
@@ -562,6 +564,7 @@ export default {
       toast(`ออกใบแจ้งหนี้ ${drafts.length} ห้องแล้ว`); re();
     };
     el.querySelector('#printall').onclick = () => printDocs(rowsFor().filter(b => b.status !== 'draft'), b => ({ lang: M.langOf(b) }));
+    el.querySelector('#incsum').onclick = () => printIncomeSummary(period);
     el.querySelector('#lineall').onclick = async () => {
       if (!isServerMode()) return toast('ต้องเชื่อม Google และตั้งค่า LINE OA ก่อน (เมนูตั้งค่า)', 4000);
       const list = rowsFor().filter(b => M.calcBill(b).ready && !isCommon(b.room) && M.billState(b) !== 'paid');
