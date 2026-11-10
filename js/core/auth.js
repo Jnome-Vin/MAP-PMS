@@ -84,6 +84,19 @@ export async function login(email, pw) {
   return session;
 }
 
+// ยืนยันรหัสผ่านของผู้ใช้ที่เข้าสู่ระบบอยู่ (ใช้ก่อนทำรายการสำคัญ เช่น ยกเลิกการผูก LINE)
+// โหมด server: ตรวจกับ hash ที่เก็บไว้ตอน login (ไม่ต้องต่อเน็ต) · ถ้าไม่มีให้ถาม server
+export async function verifyPassword(pw) {
+  if (!session || !pw) return false;
+  if (isServerMode()) {
+    const c = await db.meta('cred:' + session.email);
+    if (c?.salt && c?.hash) return await hashPassword(pw, c.salt, c.iter) === c.hash;
+    try { await api.call('login', { email: session.email, password: pw }); return true; } catch { return false; }
+  }
+  const u = db.get('users', session.email);
+  return !!u && await hashPassword(pw, u.salt) === u.hash;
+}
+
 export async function changePassword(oldPw, newPw) {
   if (newPw.length < APP.minPasswordLength) throw new Error(`รหัสผ่านใหม่ต้องยาวอย่างน้อย ${APP.minPasswordLength} ตัวอักษร`);
   if (newPw === oldPw) throw new Error('รหัสผ่านใหม่ต้องไม่ซ้ำรหัสเดิม');

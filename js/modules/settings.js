@@ -12,6 +12,32 @@ import { printInFrame } from '../core/printframe.js';
 const num = (el, id) => Number(el.querySelector('#' + id).value) || 0;
 const val = (el, id) => el.querySelector('#' + id).value.trim();
 
+// กล่องยืนยันด้วยรหัสผ่าน (ซ้อนบนหน้าต่างที่เปิดอยู่) → { newCode } เมื่อรหัสถูก · null เมื่อยกเลิก
+function passwordPrompt(title, html, extra = '') {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center';
+    ov.innerHTML = `<form class="card" style="width:min(440px,92vw);padding:18px" autocomplete="off">
+      <h3 style="margin:0 0 8px">🔐 ${esc(title)}</h3><p style="margin:0 0 10px">${html}</p>
+      <label style="display:block;font-size:13px;color:var(--muted)">รหัสผ่านของคุณ (${esc(auth.current()?.email || '')})</label>
+      <input type="password" id="pp-pw" class="input" style="width:100%;margin-top:4px" autocomplete="current-password">${extra}
+      <div class="err" id="pp-err" style="margin-top:6px"></div>
+      <div class="form-acts"><button type="button" class="btn" id="pp-x">ยกเลิก</button><button class="btn danger" id="pp-ok">ยืนยันยกเลิกการผูก</button></div></form>`;
+    document.body.appendChild(ov);
+    const pw = ov.querySelector('#pp-pw'); pw.focus();
+    const close = v => { ov.remove(); resolve(v); };
+    ov.querySelector('#pp-x').onclick = () => close(null);
+    ov.querySelector('form').onsubmit = async e => {
+      e.preventDefault();
+      const btn = ov.querySelector('#pp-ok'); btn.disabled = true;
+      const ok = await auth.verifyPassword(pw.value);
+      btn.disabled = false;
+      if (!ok) { ov.querySelector('#pp-err').textContent = 'รหัสผ่านไม่ถูกต้อง'; pw.select(); return; }
+      close({ newCode: !!ov.querySelector('#pp-new')?.checked });
+    };
+  });
+}
+
 function roomForm(r, done) {
   const isNew = !r;
   r = r || { kind: 'room', type: 'แอร์', rent: 0 };
@@ -154,8 +180,21 @@ export default {
       const box = openModal(`<h3>รหัสผูก LINE OA</h3><p class="note">ให้ผู้เช่าส่งข้อความ <b>เลขห้อง-รหัส</b> มาที่ LINE OA · กด 📋 เพื่อคัดลอกข้อความไปวางในแชทของผู้เช่า</p>
         <div class="scroll" style="max-height:50vh"><table class="tbl"><thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ข้อความที่ต้องส่ง</th><th>สถานะ</th><th></th></tr></thead><tbody>
         ${M.rooms().filter(r => r.lineCode).map(r => { const l = M.lineLinkOf(r.id); return `<tr><td>${r.id}</td><td>${esc(M.tenantOf(r.id)?.name || '-')}${M.tenantOf(r.id)?.lang === 'en' ? ' <span class="pill idle" title="ผู้เช่าต่างชาติ — ข้อความเป็นภาษาอังกฤษ">EN</span>' : ''}</td><td><code style="color:#e00000;font-weight:700">${r.id}-${r.lineCode}</code></td><td>${l ? '✅ ' + esc(l.displayName || '') : '-'}</td>
-          <td><button class="btn sm" data-copy="${r.id}" title="คัดลอกข้อความพร้อมรหัส">📋 คัดลอก</button></td></tr>`; }).join('')}
+          <td style="white-space:nowrap"><button class="btn sm" data-copy="${r.id}" title="คัดลอกข้อความพร้อมรหัส">📋 คัดลอก</button>${l && auth.current()?.role === 'admin' ? ` <button class="btn sm" data-unlink="${r.id}" style="color:var(--bad)" title="ยกเลิกการผูก LINE ของห้องนี้ (ต้องใส่รหัสผ่าน)">🔓 ยกเลิกการผูก</button>` : ''}</td></tr>`; }).join('')}
         </tbody></table></div><div class="form-acts"><button class="btn" id="cx">ปิด</button><button class="btn pri" id="cp">พิมพ์ใบแจ้งรหัส</button></div>`, { wide: true });
+      // ยกเลิกการผูก LINE: ยืนยันด้วยรหัสผ่านของผู้ใช้ที่เข้าสู่ระบบ · เลือกเปลี่ยนรหัสห้องใหม่ได้ (LINE เดิมผูกกลับด้วยรหัสเก่าไม่ได้)
+      box.querySelectorAll('[data-unlink]').forEach(b => b.onclick = async () => {
+        const room = b.dataset.unlink, links = db.all('lineLinks').filter(l => l.room === room && l.active !== false);
+        const ok = await passwordPrompt(`ยกเลิกการผูก LINE ห้อง ${room}`,
+          `LINE ที่ผูกอยู่: <b>${links.map(l => esc(l.displayName || l.lineName || '-')).join(', ')}</b><br>หลังยกเลิก บิลและสัญญาจะไม่ถูกส่งเข้า LINE นี้อีก`,
+          '<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="pp-new" checked> เปลี่ยนรหัสผูกของห้องใหม่ (LINE เดิมใช้รหัสเก่าผูกกลับไม่ได้)</label>');
+        if (!ok) return;
+        const at = new Date().toISOString(), by = auth.current()?.email || '';
+        for (const l of links) await db.put('lineLinks', { ...l, active: false, unlinkedAt: at, unlinkedBy: by });
+        if (ok.newCode) { const r = db.get('rooms', room); await db.put('rooms', { ...r, lineCode: randomString(6, '0123456789') }); }
+        toast(`ยกเลิกการผูก LINE ห้อง ${room} แล้ว${ok.newCode ? ' · เปลี่ยนรหัสใหม่แล้ว' : ''}`, 3500);
+        $e('#codes').onclick();   // แสดงตารางใหม่
+      });
       box.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
         const r = db.get('rooms', b.dataset.copy);
         try {
