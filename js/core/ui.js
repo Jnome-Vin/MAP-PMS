@@ -22,13 +22,23 @@ export function toast(msg, ms = 2600) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), ms);
 }
 
-export function openModal(html, { wide = false } = {}) {
+// sticky = ไม่ปิดเมื่อคลิกพื้นหลัง (ฟอร์มยาว เช่น ทำสัญญา — กันข้อมูลหายเพราะคลิกพลาด)
+export function openModal(html, { wide = false, sticky = false } = {}) {
   const box = $('#modal-box'); box.className = 'modal-box' + (wide ? ' wide' : '');
+  box.style.maxWidth = box.style.width = '';
+  if (sticky) box.dataset.sticky = '1'; else delete box.dataset.sticky;
   box.innerHTML = `<button type="button" class="modal-print" title="พิมพ์ป๊อปอัปนี้ (A4)">🖨️</button>` + html;
   $('#modal').classList.add('on'); return box;
 }
 export function closeModal() { $('#modal').classList.remove('on'); $('#modal-box').innerHTML = ''; document.dispatchEvent(new Event('modal-closed')); }
-document.addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+// ปิดป๊อปอัปเมื่อคลิกพื้นหลัง: ต้องกดเมาส์ลงบนพื้นหลังด้วย (กันคลิกหลงจากหน้าต่างเลือกไฟล์ของ Windows ที่ดับเบิลคลิกไฟล์
+// หรือการลากแล้วปล่อยนอกกรอบ ทำให้ป๊อปอัปปิดเอง) · ป๊อปอัปแบบ sticky ไม่ปิดจากพื้นหลังเลย
+let downOnBackdrop = false;
+document.addEventListener('pointerdown', e => { downOnBackdrop = e.target.id === 'modal'; }, true);
+document.addEventListener('click', e => {
+  if (e.target.id === 'modal' && downOnBackdrop && !$('#modal-box').dataset.sticky) closeModal();
+  downOnBackdrop = false;
+});
 
 export function confirmBox(msg, okText = 'ยืนยัน') {
   return new Promise(res => {

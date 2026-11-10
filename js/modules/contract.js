@@ -122,8 +122,12 @@ export async function openContract(tIn = {}, done) {
     <div class="form-acts">
       <button class="btn" id="c-x">ปิด</button><button class="btn" id="c-save">💾 บันทึก</button>
       <button class="btn" id="c-word">📄 Word</button><button class="btn" id="c-pdf">📕 PDF</button><button class="btn pri" id="c-print">🖨️ พิมพ์</button>
-      <button class="btn line" id="c-line" ${M.lineLinkOf(C.room) ? '' : `title="ห้อง ${esc(C.room)} ยังไม่ผูก LINE OA"`}>💬 ส่ง LINE</button></div>`, { wide: true });
+      <button class="btn line" id="c-line" ${M.lineLinkOf(C.room) ? '' : `title="ห้อง ${esc(C.room)} ยังไม่ผูก LINE OA"`}>💬 ส่ง LINE</button></div>`, { wide: true, sticky: true });
   box.style.maxWidth = '1320px'; box.style.width = '96vw';
+  // ปุ่ม ✕ ปิด มุมขวาบน (ข้างปุ่มพิมพ์) — หน้าต่างนี้ปิดได้ด้วยปุ่มปิดเท่านั้น
+  box.querySelector('.modal-print').style.right = '86px';
+  box.querySelector('#c-title').style.paddingRight = '150px';
+  box.insertAdjacentHTML('afterbegin', '<button type="button" id="c-xtop" title="ปิดหน้าต่าง" style="position:absolute;top:14px;right:14px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:14px;line-height:1.2;z-index:2">✕ ปิด</button>');
   const q = s => box.querySelector(s);
   const inp = k => box.querySelector(`[data-k="${k}"]`);
 
@@ -342,13 +346,24 @@ export async function openContract(tIn = {}, done) {
       toast(`บันทึกผู้เช่าห้อง ${rec.room} แล้ว`);
     }
     q('#c-err').textContent = '';
+    dirty = false;
     return true;
   };
   const busy = async (btn, label, fn) => {
     const old = btn.textContent; btn.disabled = true; btn.textContent = label;
     try { if (await save()) await fn(); } catch (e) { toast('ทำไม่สำเร็จ: ' + e.message, 5000); } finally { if (btn.isConnected) { btn.disabled = false; btn.textContent = old; } }
   };
-  q('#c-x').onclick = () => { closeModal(); done?.(); };
+  // ปิด: ถ้ามีข้อมูลที่ยังไม่บันทึก ถามก่อน (ซ้อนบนหน้าต่าง ไม่ปิดฟอร์มทิ้ง)
+  let dirty = false;
+  q('#cf').addEventListener('input', () => { dirty = true; });
+  q('#cf').addEventListener('change', () => { dirty = true; });
+  q('#c-x').onclick = () => {
+    if (dirty || newId || Object.keys(newPhotos).length || occs.some(o => o._new)) {
+      if (!window.confirm('ยังไม่ได้บันทึกข้อมูลในหน้าต่างนี้\nปิดโดยไม่บันทึกใช่ไหม?')) return;
+    }
+    closeModal(); done?.();
+  };
+  q('#c-xtop').onclick = () => q('#c-x').onclick();
   q('#c-save').onclick = () => busy(q('#c-save'), 'กำลังบันทึก…', async () => toast('บันทึกสัญญาแล้ว'));
   q('#c-print').onclick = () => busy(q('#c-print'), 'กำลังเตรียม…', async () => K.printContract(await docOf()));
   q('#c-pdf').onclick = () => busy(q('#c-pdf'), 'กำลังสร้าง PDF…', async () => { const pdf = await K.contractPdf(await docOf()); K.download(pdf.output('blob'), K.fileName(C, 'pdf')); toast('ดาวน์โหลด PDF แล้ว'); });
