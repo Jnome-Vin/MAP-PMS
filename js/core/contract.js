@@ -80,10 +80,9 @@ function contentTH(C, x) {
   const last = `4.${rows.length}`;
   return [
     { k: 'title', title: 'สัญญาเช่า', room: C.room },
-    { k: 'row2', l: [{ t: 'เบอร์โทร ', b: 1, c: 'head' }, { ...V(C.phone, 'blue', 20), b: 1 }], r: [T('ทำที่  มีชัย อพาร์ทเม้นท์')], sp: 1 },
+    { k: 'row2', l: [{ t: 'เบอร์โทร ', b: 1 }, { ...V(C.phone, 'blue', 20), b: 1 }], r: [T('ทำที่  มีชัย อพาร์ทเม้นท์')], sp: 1 },
     { k: 'row2', l: [T('Wifi password: meechai1234')], r: [T('วันที่ '), V(fDate(C.date), 'blue', 24)] },
-    { k: 'p', runs: [T('รหัสเครื่องสแกนใบหน้า: '), V(C.faceCode, 'blue', 16)] },
-    { k: 'p', in: 1, sp: 1, runs: [T('สัญญานี้ทำขึ้นระหว่าง มีชัย อพาร์ทเม้นท์ ซึ่งต่อไปจะเรียกว่า “ผู้ให้เช่า” ฝ่ายหนึ่ง กับ '), V(C.tenantName, 'blue', 40), T(' บัตรประจำตัวเลขที่ '), V(C.tenantId, 'blue', 30), T(' ซึ่งต่อไปนี้จะเรียกว่า “ผู้เช่า” อีกฝ่ายหนึ่ง ทั้งสองฝ่ายตกลงทำสัญญาต่อกันดังนี้')] },
+    { k: 'p', in: 1, sp: 1, runs: [T('สัญญานี้ทำขึ้นระหว่าง มีชัย อพาร์ทเม้นท์ ซึ่งต่อไปจะเรียกว่า “ผู้ให้เช่า” ฝ่ายหนึ่ง กับ '), NW(V(C.tenantName, 'blue', 40)), T(' บัตรประจำตัวเลขที่ '), NW(V(C.tenantId, 'blue', 30)), T(' ซึ่งต่อไปนี้จะเรียกว่า “ผู้เช่า” อีกฝ่ายหนึ่ง ทั้งสองฝ่ายตกลงทำสัญญาต่อกันดังนี้')] },
     { k: 'p', in: 1, sp: 1, runs: [T('1. ผู้ให้เช่าตกลงให้ผู้เช่าเช่าห้องพักอาศัย ห้องที่ '), V(C.room, 'red', 6), T(' ของอาคารเลขที่ 65/105 หมู่ 2 ถนนสามวา แขวงบางชัน เขตคลองสามวา กรุงเทพมหานคร เพื่อใช้สำหรับอยู่อาศัยเท่านั้นโดยมีผู้พักอาศัยอยู่เป็นจำนวนไม่เกิน '), V(x.occCount, 'blue', 4), T(' คน โดยได้แนบสำเนาบัตรประจำตัวประชาชนผู้อาศัยทุกท่านเป็นเอกสารแนบ')] },
     { k: 'p', in: 1, runs: [T('2. คู่สัญญาตกลงราคาค่าเช่าห้องพักอาศัย ตามข้อ 1. เป็นจำนวนเงินเดือนละ '), NW(V(C.rent, 'red', 10, money2), T(' บาท')), T(' '), NW(T('('), V(C.rent, 'red', 20, bahtText), T(')')),
       T(` โดยชำระเงินประกัน และค่าเช่าอื่น ตามข้อ 4.1-${last} รวมเป็นเงิน `), NW(C_(money(tot), 'red'), T(' บาท')), T(' '), NW(T('('), C_(bahtText(tot), 'red'), T(')'))] },
@@ -135,10 +134,9 @@ function contentEN(C, x) {
   const last = `4.${rows.length}`;
   return [
     { k: 'title', title: 'RENTAL AGREEMENT', room: C.room },
-    { k: 'row2', l: [{ t: 'Tel. ', b: 1, c: 'head' }, { ...V(C.phone, 'blue', 20), b: 1 }], r: [T('Made at  Meechai Apartment')], sp: 1 },
+    { k: 'row2', l: [{ t: 'Tel. ', b: 1 }, { ...V(C.phone, 'blue', 20), b: 1 }], r: [T('Made at  Meechai Apartment')], sp: 1 },
     { k: 'row2', l: [T('Wifi password: meechai1234')], r: [T('Date '), V(fDate(C.date, 1), 'blue', 24)] },
-    { k: 'p', runs: [T('Face scanner access code: '), V(C.faceCode, 'blue', 16)] },
-    { k: 'p', in: 1, sp: 1, runs: [T('This Agreement is made between Meechai Apartment, hereinafter called the “Lessor”, of the one part, and '), V(C.tenantName, 'blue', 40), T(', holder of Passport / Identification No. '), V(C.tenantId, 'blue', 30), T(', hereinafter called the “Lessee”, of the other part. Both parties agree as follows:')] },
+    { k: 'p', in: 1, sp: 1, runs: [T('This Agreement is made between Meechai Apartment, hereinafter called the “Lessor”, of the one part, and '), NW(V(C.tenantName, 'blue', 40)), T(', holder of Passport / Identification No. '), NW(V(C.tenantId, 'blue', 30)), T(', hereinafter called the “Lessee”, of the other part. Both parties agree as follows:')] },
     { k: 'p', in: 1, sp: 1, runs: [T('1. The Lessor agrees to let, and the Lessee agrees to rent, Room No. '), V(C.room, 'red', 6), T(' of the building at No. 65/105 Moo 2, Sam Wa Road, Bang Chan Subdistrict, Khlong Sam Wa District, Bangkok, for residential use only, with not more than '), V(x.occCount, 'blue', 4), T(' occupant(s). Copies of the passports / identification cards of all occupants are attached to this Agreement.')] },
     { k: 'p', in: 1, runs: [T('2. Both parties agree on a monthly rent for the room under Clause 1 of '), NW(V(C.rent, 'red', 10, money2), T(' Baht')), T(' '), NW(T('('), V(C.rent, 'red', 20, enWords), T(').')),
       T(` The deposits and other charges under Clauses 4.1–${last} total `), NW(C_(money(tot), 'red'), T(' Baht')), T(' '), NW(T('('), C_(enWords(tot), 'red'), T(').'))] },
@@ -199,7 +197,7 @@ function attachments(x, title) {
   const ids = x.ids || [], photos = x.photos || [];
   if (!ids.length && !photos.length) return [];
   const out = [], first = photos.slice(0, ids.length ? 4 : 4), rest = photos.slice(first.length);
-  out.push({ k: 'page' }, { k: 'att', title, ids, photos: first, tall: !ids.length });
+  out.push({ k: 'page' }, { k: 'att', title, ids, photos: first, tall: !ids.length, codeLbl: x.codeLbl });
   for (let i = 0; i < rest.length; i += 4) out.push({ k: 'page' }, { k: 'att', title, ids: [], photos: rest.slice(i, i + 4), tall: true });
   return out;
 }
@@ -236,8 +234,9 @@ export async function build(C, t, { forLine = false, getPhoto = null } = {}) {
   const en = C.lang === 'en';
   if (!forLine) {
     const main = await photoData(t.idPhoto);
-    if (main) x.ids.push({ url: main, label: (en ? 'Lessee' : 'ผู้เช่า') + (C.tenantName ? ' · ' + C.tenantName : '') });
-    for (const [i, o] of occ.entries()) { const u = await photoData(o.photo); if (u) x.ids.push({ url: u, label: `${en ? 'Occupant' : 'ผู้อาศัย'} ${i + 1}${o.name ? ' · ' + o.name : ''}` }); }
+    if (main) x.ids.push({ url: main, label: (en ? 'Lessee' : 'ผู้เช่า') + (C.tenantName ? ' · ' + C.tenantName : ''), code: C.faceCode || '' });
+    for (const [i, o] of occ.entries()) { const u = await photoData(o.photo); if (u) x.ids.push({ url: u, label: `${en ? 'Occupant' : 'ผู้อาศัย'} ${i + 1}${o.name ? ' · ' + o.name : ''}`, code: o.faceCode || '' }); }
+    x.codeLbl = en ? 'Face scanner access code: ' : 'รหัสเครื่องสแกนใบหน้า: ';
   }
   const EN_LBL = { meterE: 'Electricity meter', meterW: 'Water meter', fridge: 'Refrigerator' };
   for (const p of C.photos || []) { const u = await photoData(p.id); if (u) x.photos.push({ url: u, label: (en && EN_LBL[p.tag]) || p.label || '' }); }
@@ -282,7 +281,9 @@ const CSS = `
 .ct-cl{display:grid;grid-template-columns:48mm 22mm 24mm 1fr;align-items:start;font-size:13.5px;text-align:left}
 .ct-cl .ln{border-bottom:1px dotted #555;height:1.6em;margin-bottom:6px}
 .ct-sg1{border-bottom:1.6px dotted #333;height:2.2em;margin:0 6mm 1mm}
-.ct-atttl{font-weight:700;font-size:17px;margin:0 0 4mm}
+.ct-atttl{font-weight:700;font-size:19px;margin:0 0 4mm;text-align:center;text-decoration:underline}
+.ct-pg p.j{text-align:justify}.ct-pg .zs{font-size:0}
+.ct-att figcaption{text-align:center}.ct-att figcaption .fc{color:#000;font-size:13px}
 .ct-att{display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin-bottom:6mm}
 .ct-att.one{grid-template-columns:1fr;width:calc(50% - 3mm);margin-left:auto;margin-right:auto}
 .ct-att figure{margin:0;display:flex;flex-direction:column;align-items:center}
@@ -293,18 +294,33 @@ const CSS = `
 @media screen{.ct-pg{margin:12px auto;box-shadow:0 2px 12px rgba(0,0,0,.14)}}
 `;
 const cls = r => [r.c ? 'c-' + r.c : '', r.dots ? 'dots' : ''].filter(Boolean).join(' ');
-const runHtml = r => {
-  if (r.nw) return `<span class="nw">${r.nw.map(runHtml).join('')}</span>`;
-  let h = esc(r.t);
+// เบราว์เซอร์จัดชิดขอบ (justify) ภาษาไทยได้เฉพาะตรงช่องว่าง → แทรกช่องว่างขนาด 0 ระหว่างคำ ให้ยืดได้ทุกคำแบบ Word (Thai Distributed)
+const SEG = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
+const GSEG = SEG ? new Intl.Segmenter('th', { granularity: 'grapheme' }) : null;
+// ชื่อเฉพาะที่ตัวตัดคำแยกผิด → ไม่ตัดกลางคำ
+const KEEP_W = ['มีชัย', 'อพาร์ทเม้นท์', 'คลองสามวา', 'สามวา', 'บางชัน', 'กรุงเทพมหานคร', 'ผู้ให้เช่า', 'ผู้เช่า', 'ผู้อาศัย', 'ผู้พักอาศัย'];
+const KEEP = new RegExp(`(${KEEP_W.join('|')})`), KEEP_ONE = new RegExp(`^(${KEEP_W.join('|')})$`);
+// ห้ามแทรกติดช่องว่างเดิม (ช่องว่างติดกันจะถูกยุบรวม ทำให้ช่องว่างจริงหาย)
+const thJ = s => {
+  if (!SEG || !/[฀-๿]/.test(s)) return esc(s);
+  const seg = s.split(KEEP).filter(Boolean).flatMap(p => (KEEP_ONE.test(p) ? [p] : [...SEG.segment(p)].map(x => x.segment)));
+  // Thai Distributed (แบบ Word): ในคำคั่นทุกตัวอักษรด้วยช่องว่างไม่ตัดบรรทัดขนาด 0 (ยืดได้แต่ไม่ตัดกลางคำ) · ระหว่างคำใช้ช่องว่างปกติขนาด 0 (ตัดบรรทัดได้)
+  const dist = w => (/^\s+$/.test(w) ? esc(w) : [...GSEG.segment(w)].map(g => esc(g.segment)).join('<span class="zs"> </span>'));
+  return seg.map((x, i) => dist(x) + (i < seg.length - 1 && !/\s$/.test(x) && !/^\s/.test(seg[i + 1]) ? '<span class="zs"> </span>' : '')).join('');
+};
+const runHtml = (r, j) => {
+  if (r.nw) return `<span class="nw">${r.nw.map(x => runHtml(x)).join('')}</span>`;
+  let h = j && !r.dots ? thJ(r.t) : esc(r.t);
   if (r.b) h = `<b>${h}</b>`; if (r.i) h = `<i>${h}</i>`; if (r.u) h = `<u>${h}</u>`;
   const c = cls(r); return c ? `<span class="${c}">${h}</span>` : h;
 };
-const runsHtml = rs => rs.map(runHtml).join('');
+const runsHtml = (rs, j) => rs.map(r => runHtml(r, j)).join('');
 function blockHtml(b, ctx) {
   switch (b.k) {
     case 'title': return `<div class="ct-title"><u>${esc(b.title)}</u><div class="ct-room">${esc(b.room || '')}</div></div>`;
     case 'row2': return `<div class="ct-row2"${b.sp ? ' style="margin-top:14px"' : ''}><span>${runsHtml(b.l)}</span><span>${runsHtml(b.r)}</span></div>`;
-    case 'p': return `<p class="${[b.in ? 'in' : '', b.ind ? 'ind' : '', b.sp ? 'sp' : '', b.center ? 'ctr' : ''].join(' ')}">${runsHtml(b.runs)}</p>`;
+    case 'p': { const j = !b.center && !ctx.en;
+      return `<p class="${[b.in ? 'in' : '', b.ind ? 'ind' : '', b.sp ? 'sp' : '', b.center ? 'ctr' : '', j ? 'j' : ''].join(' ')}">${runsHtml(b.runs, j)}</p>`; }
     case 'rate': return `<div class="ct-rate"><span>${esc(b.a)}</span><span>${esc(b.b)}</span></div>`;
     case 'items': return `<table class="ct-items">${b.rows.map(([n, r, a]) => `<tr><td style="width:9mm">${n}</td><td>${runsHtml(r)}</td><td class="l">${esc(b.word)}</td><td class="a">${runHtml(a)}</td><td class="u">${esc(b.unit)}</td></tr>`).join('')}</table>`;
     case 'qr': return ctx.qr ? `<div class="ct-qr"><img src="${ctx.qr}" alt="QR"></div>` : '';
@@ -322,7 +338,8 @@ function blockHtml(b, ctx) {
     case 'item': return `<div class="ct-cl"><span>${esc(b.label)}</span><span><span class="ct-box"></span>${esc(b.ok)}</span><span><span class="ct-box"></span>${esc(b.ng)}</span><div><div class="ln"></div><div class="ln"></div></div></div>`;
     case 'insp': return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:20mm;text-align:center;margin-top:6mm"><div><div class="ct-sg1"></div>${esc(b.roles[0])}</div><div><div class="ct-sg1"></div>${esc(b.roles[1])}</div></div>`;
     case 'att': {
-      const fig = (p, c) => `<figure><div class="im ${c}"><img src="${p.url}" alt=""></div>${p.label ? `<figcaption>${esc(p.label)}</figcaption>` : ''}</figure>`;
+      const code = p => p.code != null ? `<div class="fc">${esc(b.codeLbl || '')}${p.code ? `<span class="c-blue">${esc(p.code)}</span>` : `<span class="dots">${'.'.repeat(16)}</span>`}</div>` : '';
+      const fig = (p, c) => `<figure><div class="im ${c}"><img src="${p.url}" alt=""></div>${p.label ? `<figcaption>${esc(p.label)}${code(p)}</figcaption>` : ''}</figure>`;
       return `<div><p class="ct-atttl">${esc(b.title)}</p>${b.ids.length ? `<div class="ct-att${b.ids.length === 1 ? ' one' : ''}">${b.ids.map(p => fig(p, 'id')).join('')}</div>` : ''}
         ${b.photos.length ? `<div class="ct-att">${b.photos.map(p => fig(p, b.tall ? 'tall' : '')).join('')}</div>` : ''}</div>`;
     }
@@ -401,7 +418,8 @@ const rPr = r => {
   const c = r.c ? COLOR[r.c] : r.dots ? COLOR.gray : '';
   return `<w:rPr>${r.b ? '<w:b/><w:bCs/>' : ''}${r.i ? '<w:i/><w:iCs/>' : ''}${c ? `<w:color w:val="${c}"/>` : ''}${r.sz ? `<w:sz w:val="${r.sz}"/><w:szCs w:val="${r.sz}"/>` : ''}${r.u ? '<w:u w:val="single"/>' : ''}</w:rPr>`;
 };
-const flat = rs => rs.flatMap(r => (r.nw ? flat(r.nw) : [r]));
+// กลุ่มห้ามตัดบรรทัด (เช่น ชื่อ-สกุล) → ใช้ช่องว่างแบบไม่ตัดบรรทัดใน Word
+const flat = rs => rs.flatMap(r => (r.nw ? flat(r.nw).map(x => (x.dots ? x : { ...x, t: String(x.t).replace(/ /g, ' ') })) : [r]));
 const runX = r => `<w:r>${rPr(r)}<w:t xml:space="preserve">${xmlEsc(r.t)}</w:t></w:r>`;
 const tab = (r = {}) => `<w:r>${rPr(r)}<w:tab/></w:r>`;
 const P = (inner, { jc, ind, first, before = 0, after = 0, tabs = '', keep } = {}) =>
@@ -450,10 +468,12 @@ async function blockDocx(b, ctx) {
       P(tab() + runX({ t: b.roles[0] }) + tab() + runX({ t: b.roles[1] }), { tabs: TABS([2300, 'center'], [7300, 'center']) });
     case 'att': {
       const half = Math.floor(W / 2);
-      const cell = async (p, mw, mh) => { const [w, h] = fit(await imgSize(p.url), mw, mh); return cellX(half, P(ctx.wr.drawing(ctx.wr.addImage(p.url), w, h), { jc: 'center' }) + (p.label ? P(runX({ t: p.label, sz: 24 }), { jc: 'center', after: 120 }) : P('', { after: 120 }))); };
+      const cap = p => !p.label ? P('', { after: 120 }) : p.code == null ? P(runX({ t: p.label, sz: 24 }), { jc: 'center', after: 120 })
+        : P(runX({ t: p.label, sz: 24 }), { jc: 'center' }) + P(runX({ t: b.codeLbl || '', sz: 24 }) + (p.code ? runX({ t: p.code, c: 'blue', sz: 24 }) : runX({ t: '.'.repeat(16), dots: 1, sz: 24 })), { jc: 'center', after: 120 });
+      const cell = async (p, mw, mh) => { const [w, h] = fit(await imgSize(p.url), mw, mh); return cellX(half, P(ctx.wr.drawing(ctx.wr.addImage(p.url), w, h), { jc: 'center' }) + cap(p)); };
       const grid = async (list, mw, mh) => { const rows = []; for (let i = 0; i < list.length; i += 2) rows.push((await cell(list[i], mw, mh)) + (list[i + 1] ? await cell(list[i + 1], mw, mh) : cellX(half, P('')))); return rows.length ? tableX([half, W - half], rows) : ''; };
-      const ids = b.ids.length === 1 ? tableX([W], [cellX(W, P(ctx.wr.drawing(ctx.wr.addImage(b.ids[0].url), ...fit(await imgSize(b.ids[0].url), 82, 54)), { jc: 'center' }) + P(runX({ t: b.ids[0].label, sz: 24 }), { jc: 'center', after: 120 }))]) : await grid(b.ids, 82, 54);
-      return P(runX({ t: b.title, b: 1, sz: 34 }), { after: 120 }) + ids + await grid(b.photos, 82, b.tall ? 105 : 72);
+      const ids = b.ids.length === 1 ? tableX([W], [cellX(W, P(ctx.wr.drawing(ctx.wr.addImage(b.ids[0].url), ...fit(await imgSize(b.ids[0].url), 82, 54)), { jc: 'center' }) + cap(b.ids[0]))]) : await grid(b.ids, 82, 54);
+      return P(runX({ t: b.title, b: 1, u: 1, sz: 38 }), { jc: 'center', after: 120 }) + ids + await grid(b.photos, 82, b.tall ? 105 : 72);
     }
   }
   return '';

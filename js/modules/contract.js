@@ -229,12 +229,14 @@ export async function openContract(tIn = {}, done) {
   const drawOccs = () => {
     q('#c-occs').innerHTML = occs.map((o, i) => `<div class="idbox" data-odrop="${i}" style="margin-top:8px"><div class="ph" data-oph="${i}">${o._new ? `<img src="${o._new}">` : o.photo ? '…' : `ผู้อาศัย ${i + 1}<br><small>ลากรูปมาวาง</small>`}</div>
       <div style="flex:1"><input class="f-blue" data-on="${i}" value="${esc(o.name)}" placeholder="ชื่อผู้อาศัย ${i + 1}">
+        <input class="f-blue" data-ofc="${i}" value="${esc(o.faceCode || '')}" placeholder="🔐 รหัสเครื่องสแกนใบหน้า" style="margin-top:6px">
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><label class="btn sm" for="c-of${i}">📎 แนบบัตร</label><input id="c-of${i}" data-of="${i}" type="file" accept="image/*" hidden>
         <label class="btn sm" for="c-oc${i}">📷</label><input id="c-oc${i}" data-of="${i}" type="file" accept="image/*" capture="environment" hidden>
         <button class="btn sm" type="button" data-oed="${i}" title="หมุน / ครอปรูป">✏️ ปรับรูป</button>
         <button class="btn sm" type="button" data-orm="${i}" title="ลบ">✕</button></div><div class="msg" data-omsg="${i}"></div></div></div>`).join('');
     occs.forEach((o, i) => { if (o.photo && !o._new) photoUrl(o.photo).then(u => { const el = q(`[data-oph="${i}"]`); if (el && u) el.innerHTML = `<img src="${u}">`; }); });
     box.querySelectorAll('[data-on]').forEach(x => x.oninput = () => { occs[+x.dataset.on].name = x.value; calc(); });
+    box.querySelectorAll('[data-ofc]').forEach(x => x.oninput = () => { occs[+x.dataset.ofc].faceCode = x.value; calc(); });
     box.querySelectorAll('[data-orm]').forEach(x => x.onclick = () => { occs.splice(+x.dataset.orm, 1); drawOccs(); calc(); });
     const useOcc = (i, url) => {
       occs[i]._new = url; drawOccs(); calc();
