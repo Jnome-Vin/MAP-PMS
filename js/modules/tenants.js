@@ -244,6 +244,8 @@ export function openTenantForm(t, done) {
     const miss = M.missingInfo(rec);
     stopCam(); closeModal();
     toast((isNew ? `บันทึกผู้เช่าห้อง ${rec.room} แล้ว` : 'บันทึกการแก้ไขแล้ว') + (miss.length ? ` — ⚠️ ยังขาด: ${miss.join(', ')}` : ''), miss.length ? 5000 : 2500); done?.();
+    // ผู้เช่าเข้าใหม่ → ทำสัญญาเช่าต่อทันที (ข้อมูลจากที่เพิ่งกรอก)
+    if (isNew) import('./contract.js').then(m => m.openContract(rec, done));
   };
   $('#tdel')?.addEventListener('click', async () => {
     if (!await confirmBox(`ลบข้อมูลผู้เช่า ${t.name} ห้อง ${t.room}? (ใช้กรณีบันทึกผิด ถ้าย้ายออกให้ใช้ "ย้ายออก")`, 'ลบ')) return;
@@ -376,12 +378,13 @@ export function openTenantHistory(t, done) {
     ${bills.map(b => { const c = M.calcBill(b), s = M.billState(b); return `<tr><td>${periodLabel(b.period, true)}</td><td>${esc(b.invoiceNo || '')}</td><td class="n">${fmt0(b.rent)}</td>
       <td class="n">${fmt0(c.water)}</td><td class="n">${fmt0(c.elec)}</td><td class="n">${fmt0(c.total)}</td><td>${['paid', 'partial'].includes(s) ? `<button class="pill ${M.BILL_TXT[s][1]} pay-btn" data-pd="${b.id}" title="ดูรายละเอียดการโอน / แก้ไข">${M.BILL_TXT[s][0]} 🔍</button>` : `<span class="pill ${M.BILL_TXT[s][1]}">${M.BILL_TXT[s][0]}</span>`}</td></tr>`; }).join('') || '<tr><td colspan="7" class="note">ไม่มีบิลที่ผูกกับผู้เช่ารายนี้</td></tr>'}
     </tbody></table></div>
-    <div class="form-acts">${t.moveOutDoc ? '<button class="btn" id="hrefund">🖨️ เอกสารคืนเงิน</button>' : ''}
+    <div class="form-acts"><button class="btn" id="hcontract">📝 สัญญาเช่า</button>${t.moveOutDoc ? '<button class="btn" id="hrefund">🖨️ เอกสารคืนเงิน</button>' : ''}
       ${!t.active && !M.tenantOf(t.room) && M.pastTenantsOf(t.room)[0]?.id === t.id ? '<button class="btn" id="hcancel">↩ ยกเลิกการย้ายออก</button>' : ''}
       <button class="btn" id="hx">ปิด</button><button class="btn pri" id="hedit">แก้ไขข้อมูล</button></div>`, { wide: true });
   box.querySelector('#hx').onclick = closeModal;
   box.querySelector('#hedit').onclick = () => openTenantForm(t, done);
   box.querySelector('#hrefund')?.addEventListener('click', () => printRefund(t));
+  box.querySelector('#hcontract').onclick = () => import('./contract.js').then(m => m.openContract(t, done));
   // ดูรายละเอียดการโอนของบิล (import แบบ dynamic เพื่อเลี่ยงการอ้างอิงวนกับ billing.js)
   box.querySelectorAll('[data-pd]').forEach(x => x.onclick = () => import('./billing.js').then(m => m.openPaymentDetail(db.get('bills', x.dataset.pd), done)));
   box.querySelector('#hcancel')?.addEventListener('click', () => { closeModal(); cancelMoveOut(t, done); });

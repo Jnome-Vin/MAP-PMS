@@ -1,14 +1,14 @@
 // Service worker: เก็บไฟล์แอปไว้ในเครื่องเพื่อเปิดใช้งานได้แม้ไม่มีอินเทอร์เน็ต
 // มีเน็ต → ดึงไฟล์ล่าสุดจาก server เสมอ (ได้เวอร์ชันใหม่ทันที) / ไม่มีเน็ตหรือช้าเกิน 4 วินาที → ใช้ไฟล์ในเครื่อง
 // เมื่อแก้ไฟล์ในแอป ให้เปลี่ยน VERSION ด้วย
-const VERSION = 'map-pms-v0.9.34';
+const VERSION = 'map-pms-v0.9.35';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'icons/icon.svg', 'css/app.css', 'assets/logo.png', 'assets/brand-logo.png', 'assets/signature.png', 'assets/payment-qr.png',
   'assets/nav/dashboard.png', 'assets/nav/floorplan.png', 'assets/nav/parking.png', 'assets/nav/billing.png', 'assets/nav/tenants.png', 'assets/nav/reports.png', 'assets/nav/users.png',
   'js/main.js', 'js/core/config.js', 'js/core/ui.js', 'js/core/db.js', 'js/core/api.js', 'js/core/auth.js',
-  'js/core/sync.js', 'js/core/model.js', 'js/core/docs.js', 'js/core/slip.js', 'js/core/idcard.js', 'js/core/print.js', 'js/core/printframe.js', 'js/core/incomeReport.js', 'js/data/seed.js',
+  'js/core/sync.js', 'js/core/model.js', 'js/core/docs.js', 'js/core/slip.js', 'js/core/idcard.js', 'js/core/print.js', 'js/core/printframe.js', 'js/core/incomeReport.js', 'js/core/zip.js', 'js/core/contract.js', 'js/data/seed.js',
   'js/modules/login.js', 'js/modules/dashboard.js', 'js/modules/floorplan.js', 'js/modules/parking.js',
-  'js/modules/billing.js', 'js/modules/tenants.js', 'js/modules/reports.js', 'js/modules/birthdays.js', 'js/modules/users.js', 'js/modules/settings.js',
+  'js/modules/billing.js', 'js/modules/tenants.js', 'js/modules/reports.js', 'js/modules/birthdays.js', 'js/modules/users.js', 'js/modules/settings.js', 'js/modules/contract.js',
 ];
 
 self.addEventListener('install', e => {

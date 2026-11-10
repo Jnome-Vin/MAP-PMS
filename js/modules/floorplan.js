@@ -101,7 +101,7 @@ function detail(id) {
     <div class="scroll" style="max-height:220px;margin-top:6px"><table class="tbl">${M.stays(id).map(p =>
     `<tr class="click" data-past="${p.id}"><td style="white-space:normal">${esc(p.name)}${p.active ? ' <span class="pill ok">ปัจจุบัน</span>' : ''}</td>
       <td class="note" style="white-space:normal">${thDate(p.since)} – ${p.active ? 'ปัจจุบัน' : thDate(p.moveOut)}<br>${M.stayText(p.since, p.active ? null : p.moveOut)}</td></tr>`).join('')}</table></div></details>` : ''}
-  <div class="acts">${t ? `<button class="btn pri" data-a="bill">บิลของห้องนี้</button><button class="btn" data-a="edit">แก้ไขผู้เช่า</button><button class="btn" data-a="out">ย้ายออก</button>`
+  <div class="acts">${t ? `<button class="btn pri" data-a="bill">บิลของห้องนี้</button><button class="btn" data-a="edit">แก้ไขผู้เช่า</button><button class="btn" data-a="contract">📝 สัญญาเช่า</button><button class="btn" data-a="out">ย้ายออก</button>`
     : `<button class="btn pri" data-a="in">+ ผู้เช่าเข้าใหม่</button>${r.kind !== 'room' ? '<button class="btn" data-a="bill">บิล/มิเตอร์</button>' : ''}${M.pastTenantsOf(id)[0] ? `<button class="btn" data-a="undo" title="ใช้เมื่อกดย้ายออกผิด">↩ ยกเลิกการย้ายออก (${esc(M.pastTenantsOf(id)[0].name)})</button>` : ''}${M.pastTenantsOf(id)[0]?.moveOutDoc ? '<button class="btn" data-a="refund">🖨️ เอกสารคืนเงิน</button>' : ''}`}</div>`;
 }
 
@@ -139,6 +139,7 @@ export default {
     act('fill')?.addEventListener('click', e => { e.preventDefault(); openTenantForm(t, () => this.render(el, nav)); });
     act('in')?.addEventListener('click', () => openTenantForm({ room: sel }, () => this.render(el, nav)));
     act('out')?.addEventListener('click', () => moveOut(t, () => this.render(el, nav)));
+    act('contract')?.addEventListener('click', () => import('./contract.js').then(m => m.openContract(t, () => this.render(el, nav))));
     act('lastbill')?.addEventListener('click', () => {
       const lb = db.all('bills').filter(b => b.room === sel).sort((a, b) => b.period.localeCompare(a.period))[0];
       ['paid', 'partial'].includes(M.billState(lb)) ? openPaymentDetail(lb, () => this.render(el, nav)) : openPayment(lb, () => this.render(el, nav));

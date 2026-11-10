@@ -132,6 +132,7 @@ const loadLib = key => loaded[key] ||= new Promise((res, rej) => {
   const s = document.createElement('script'); s.src = LIBS[key]; s.onload = res; s.onerror = () => { delete loaded[key]; rej(new Error('โหลดตัวสร้าง PDF ไม่ได้')); };
   document.head.appendChild(s);
 });
+export const pdfLibs = () => Promise.all([loadLib('html2canvas'), loadLib('jspdf')]);   // ใช้ร่วมกับสัญญาเช่า (core/contract.js)
 export async function docPdf(b, opts) {
   await Promise.all([loadLib('html2canvas'), loadLib('jspdf')]);
   await document.fonts?.ready;
