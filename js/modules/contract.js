@@ -403,7 +403,8 @@ export async function openContract(tIn = {}, done) {
   q('#c-word').onclick = () => busy(q('#c-word'), 'กำลังสร้าง Word…', async () => { K.download(await K.contractDocx(await docOf()), K.fileName(C, 'docx')); toast('ดาวน์โหลดไฟล์ Word แล้ว'); });
   q('#c-line').onclick = () => busy(q('#c-line'), 'กำลังส่ง LINE…', async () => {
     const r = await K.sendContractLine(C, tenantView(), photoUrl);
-    const rec = db.get('tenants', t.id); await db.put('tenants', { ...rec, contract: { ...rec.contract, lineSentAt: new Date().toISOString(), pdfUrl: r.pdfUrl || '' } });
+    const rec = db.get('tenants', t.id);   // ผู้เช่าใหม่ที่ยังไม่กดบันทึกจะยังไม่มีในฐานข้อมูล
+    if (rec) await db.put('tenants', { ...rec, contract: { ...rec.contract, lineSentAt: new Date().toISOString(), pdfUrl: r.pdfUrl || '' } });
     toast(r.sent ? `ส่งสัญญาเข้า LINE ห้อง ${C.room} แล้ว` : `ห้อง ${C.room} ยังไม่ผูก LINE OA — เก็บ PDF ไว้ใน Drive แล้ว`, 4000);
   });
   calc();
