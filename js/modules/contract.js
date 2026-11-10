@@ -6,6 +6,7 @@ import { esc, toast, openModal, closeModal, uid, bahtText } from '../core/ui.js'
 import { readIdDocument, occ as occOf } from '../core/idcard.js';
 import * as K from '../core/contract.js';
 import { compress, fileToDataUrl } from './tenants.js';
+import { editImage, dropZone } from '../core/imgedit.js';
 
 const CSS = `
 .ctm{display:grid;grid-template-columns:minmax(360px,440px) 1fr;gap:14px;align-items:start}
@@ -28,6 +29,9 @@ const CSS = `
 .ctm .idbox .ph{width:110px;height:70px;border-radius:6px;background:#e7eef5;display:flex;align-items:center;justify-content:center;font-size:11px;color:#5a6c7e;flex:none;text-align:center;overflow:hidden}
 .ctm .idbox .ph img{width:100%;height:100%;object-fit:cover}
 .ctm .msg{font-size:12px;color:#2e8b57;margin-top:4px}
+.ctm .idbox,.ctm .thumbs{transition:background .15s,border-color .15s}
+.ctm .drop-on{background:#e3f0fb!important;border-color:#1f5f8b!important;outline:2px dashed #1f5f8b;outline-offset:2px}
+.ctm .idbox .ph small{display:block;font-size:10px;color:#8a99a8;margin-top:2px}
 .ctm .xrow{display:grid;grid-template-columns:1fr 90px 34px;gap:6px;margin-top:6px}
 .ctm .thumbs{display:flex;gap:8px;flex-wrap:wrap}
 .ctm .thumbs .t{width:76px;text-align:center;font-size:11px;color:var(--muted)}
@@ -68,9 +72,10 @@ export async function openContract(tIn = {}, done) {
       <label class="lang"><span><b>🌐 ผู้เช่าเป็นชาวต่างชาติ</b><small>เปิด = สัญญาภาษาอังกฤษ · อ่าน Passport แทนบัตรประชาชน</small></span>
         <span class="sw"><input type="checkbox" id="c-en" ${C.lang === 'en' ? 'checked' : ''}><span></span></span></label>
       <div class="sec"><h4>🪪 1. <span id="c-idt">${C.lang === 'en' ? 'Passport' : 'บัตรประชาชน'}</span> <small>อ่านด้วยตัวอ่านในเครื่อง (ฟรี) แล้วตรวจแก้ได้</small></h4>
-        <div class="idbox"><div class="ph" id="c-ph">${t.idPhoto ? 'กำลังโหลด…' : 'ยังไม่มีรูป'}</div>
-          <div style="flex:1"><label class="btn sm" for="c-idf">📎 แนบรูป</label><input id="c-idf" type="file" accept="image/*" hidden>
+        <div class="idbox" id="c-idbox"><div class="ph" id="c-ph">${t.idPhoto ? 'กำลังโหลด…' : 'ยังไม่มีรูป<br><small>ลากรูปมาวางที่กรอบนี้ได้</small>'}</div>
+          <div style="flex:1"><div style="display:flex;gap:6px;flex-wrap:wrap"><label class="btn sm" for="c-idf">📎 แนบรูป</label><input id="c-idf" type="file" accept="image/*" hidden>
             <label class="btn sm" for="c-idc">📷 ถ่ายรูป</label><input id="c-idc" type="file" accept="image/*" capture="environment" hidden>
+            <button class="btn sm" type="button" id="c-idedit" title="หมุน / ครอปรูป">✏️ ปรับรูป</button></div>
             <div class="msg" id="c-idmsg"></div></div></div>
         <div class="g2">
           <div class="full"><label class="l">🔐 รหัสเครื่องสแกนใบหน้า</label><input class="f-blue" data-k="faceCode" value="${esc(C.faceCode)}" placeholder="รหัสสำหรับลงทะเบียนสแกนใบหน้า"></div>
@@ -106,7 +111,7 @@ export async function openContract(tIn = {}, done) {
           <div class="full"><label class="l">ยอดรวมวันทำสัญญา (ข้อ 2)</label><input class="f-red" id="c-total" disabled><div class="auto">อัตโนมัติ = 4.1 + 4.2 + 4.3 + 4.4 + 4.5 + ค่าเช่าอื่นๆ</div></div>
         </div>
       </div>
-      <div class="sec"><h4>🖼️ 3. รูปแนบ <small>ไม่บังคับ · หน้าละ 4 รูป · ใบตรวจสภาพห้องแนบให้อัตโนมัติ</small></h4>
+      <div class="sec"><h4>🖼️ 3. รูปแนบ <small>ไม่บังคับ · ลากรูปมาวางได้ · กดรูปเพื่อหมุน/ครอป · ใบตรวจสภาพห้องแนบให้อัตโนมัติ</small></h4>
         <div class="thumbs" id="c-ph3"></div>
         <input id="c-pf" type="file" accept="image/*" multiple hidden>
       </div>
@@ -195,9 +200,10 @@ export async function openContract(tIn = {}, done) {
       msgEl.innerHTML = `✅ อ่านจาก${r.type === 'passport' ? ' Passport' : 'บัตรประชาชน'}แล้ว${r.type === 'thai-id' && r.idNo && !r.validId ? ' · <span style="color:var(--bad)">⚠️ เลขบัตรไม่ผ่านเลขตรวจสอบ</span>' : ''} — กรุณาตรวจทาน`;
     } catch (x) { msgEl.textContent = 'อ่านไม่สำเร็จ: ' + x.message + ' — กรอกเองได้'; }
   };
-  const onId = async e => {
-    const f = e.target.files[0]; if (!f) return;
-    newId = await compress(await fileToDataUrl(f)); showIdThumb(newId); preview();
+  // รูปใหม่ (เลือกไฟล์ / ถ่าย / ลากมาวาง) → ปรับรูป (หมุน ครอป) ก่อนใช้
+  const pick = async (file, title) => editImage(await compress(await fileToDataUrl(file)), { title });
+  const useId = url => {
+    newId = url; showIdThumb(newId); preview();
     readCard(newId, r => {
       if (r.name) setVal('tenantName', r.name); if (r.idNo) setVal('tenantId', r.idNo);
       if (r.birthDate) setVal('birthDate', r.birthDate); if (r.address) setVal('address', r.address);
@@ -205,22 +211,38 @@ export async function openContract(tIn = {}, done) {
       calc();
     }, q('#c-idmsg'));
   };
-  q('#c-idf').onchange = onId; q('#c-idc').onchange = onId;
+  const onIdFile = async f => { if (!f) return; const u = await pick(f, 'ปรับรูปบัตรผู้เช่า'); if (u) useId(u); };
+  q('#c-idf').onchange = e => { onIdFile(e.target.files[0]); e.target.value = ''; };
+  q('#c-idc').onchange = e => { onIdFile(e.target.files[0]); e.target.value = ''; };
+  dropZone(q('#c-idbox'), fs => onIdFile(fs[0]));
+  q('#c-idedit').onclick = async () => {
+    const cur = newId || (t.idPhoto ? await photoUrl(t.idPhoto) : '');
+    if (!cur) return toast('ยังไม่มีรูปบัตร — แนบหรือลากรูปมาวางก่อน');
+    const u = await editImage(cur, { title: 'ปรับรูปบัตรผู้เช่า' }); if (u) useId(u);
+  };
 
   // ---------- ผู้อาศัยร่วม ----------
   const drawOccs = () => {
-    q('#c-occs').innerHTML = occs.map((o, i) => `<div class="idbox" style="margin-top:8px"><div class="ph" data-oph="${i}">${o._new ? `<img src="${o._new}">` : o.photo ? '…' : `ผู้อาศัย ${i + 1}`}</div>
+    q('#c-occs').innerHTML = occs.map((o, i) => `<div class="idbox" data-odrop="${i}" style="margin-top:8px"><div class="ph" data-oph="${i}">${o._new ? `<img src="${o._new}">` : o.photo ? '…' : `ผู้อาศัย ${i + 1}<br><small>ลากรูปมาวาง</small>`}</div>
       <div style="flex:1"><input class="f-blue" data-on="${i}" value="${esc(o.name)}" placeholder="ชื่อผู้อาศัย ${i + 1}">
-        <div style="display:flex;gap:6px;margin-top:6px"><label class="btn sm" for="c-of${i}">📎 แนบบัตร</label><input id="c-of${i}" data-of="${i}" type="file" accept="image/*" hidden>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><label class="btn sm" for="c-of${i}">📎 แนบบัตร</label><input id="c-of${i}" data-of="${i}" type="file" accept="image/*" hidden>
         <label class="btn sm" for="c-oc${i}">📷</label><input id="c-oc${i}" data-of="${i}" type="file" accept="image/*" capture="environment" hidden>
+        <button class="btn sm" type="button" data-oed="${i}" title="หมุน / ครอปรูป">✏️ ปรับรูป</button>
         <button class="btn sm" type="button" data-orm="${i}" title="ลบ">✕</button></div><div class="msg" data-omsg="${i}"></div></div></div>`).join('');
     occs.forEach((o, i) => { if (o.photo && !o._new) photoUrl(o.photo).then(u => { const el = q(`[data-oph="${i}"]`); if (el && u) el.innerHTML = `<img src="${u}">`; }); });
     box.querySelectorAll('[data-on]').forEach(x => x.oninput = () => { occs[+x.dataset.on].name = x.value; calc(); });
     box.querySelectorAll('[data-orm]').forEach(x => x.onclick = () => { occs.splice(+x.dataset.orm, 1); drawOccs(); calc(); });
-    box.querySelectorAll('[data-of]').forEach(x => x.onchange = async e => {
-      const i = +x.dataset.of, f = e.target.files[0]; if (!f) return;
-      occs[i]._new = await compress(await fileToDataUrl(f)); drawOccs(); calc();
-      readCard(occs[i]._new, r => { if (r.name) occs[i].name = r.name; if (r.idNo) occs[i].idNo = r.idNo; const n = q(`[data-on="${i}"]`); if (n) n.value = occs[i].name; calc(); }, q(`[data-omsg="${i}"]`));
+    const useOcc = (i, url) => {
+      occs[i]._new = url; drawOccs(); calc();
+      readCard(url, r => { if (r.name) occs[i].name = r.name; if (r.idNo) occs[i].idNo = r.idNo; const n = q(`[data-on="${i}"]`); if (n) n.value = occs[i].name; calc(); }, q(`[data-omsg="${i}"]`));
+    };
+    const onOccFile = async (i, f) => { if (!f) return; const u = await pick(f, `ปรับรูปบัตรผู้อาศัย ${i + 1}`); if (u) useOcc(i, u); };
+    box.querySelectorAll('[data-of]').forEach(x => x.onchange = e => { onOccFile(+x.dataset.of, e.target.files[0]); e.target.value = ''; });
+    box.querySelectorAll('[data-odrop]').forEach(x => dropZone(x, fs => onOccFile(+x.dataset.odrop, fs[0])));
+    box.querySelectorAll('[data-oed]').forEach(x => x.onclick = async () => {
+      const i = +x.dataset.oed, o = occs[i], cur = o._new || (o.photo ? await photoUrl(o.photo) : '');
+      if (!cur) return toast('ยังไม่มีรูปบัตร — แนบหรือลากรูปมาวางก่อน');
+      const u = await editImage(cur, { title: `ปรับรูปบัตรผู้อาศัย ${i + 1}` }); if (u) useOcc(i, u);
     });
     q('#c-occadd').disabled = occs.length >= maxOcc;
   };
@@ -246,21 +268,35 @@ export async function openContract(tIn = {}, done) {
     const cell = (p, icon, label, tag) => `<div class="t"><div class="im ${p ? '' : 'add'}" data-pick="${tag}" ${tag === 'fridge' && !p ? 'style="background:#fff1e8"' : ''}>${p ? `<img data-pimg="${p.id}"><button type="button" class="rm" data-prm="${p.id}">✕</button>` : icon}</div>${label}</div>`;
     q('#c-ph3').innerHTML = SLOTS.map(([tag, icon, label]) => cell(byTag(tag), icon, label, tag)).join('') + others.map(p => cell(p, '', p.label || 'รูป', 'x')).join('') + `<div class="t"><div class="im add" data-pick="other">+ เพิ่ม</div>รูปอื่นๆ</div>`;
     for (const img of box.querySelectorAll('[data-pimg]')) img.src = await photoUrl(img.dataset.pimg);
-    box.querySelectorAll('[data-pick]').forEach(x => x.onclick = e => { if (e.target.closest('[data-prm]') || x.querySelector('img')) return; pickFor = x.dataset.pick; q('#c-pf').multiple = pickFor === 'other'; q('#c-pf').click(); });
+    box.querySelectorAll('[data-pick]').forEach(x => x.onclick = async e => {
+      if (e.target.closest('[data-prm]')) return;
+      const img = x.querySelector('img[data-pimg]');
+      if (img) {   // กดรูปที่มีอยู่ → ปรับรูป (หมุน / ครอป) แล้วแทนรูปเดิม
+        const u = await editImage(img.src, { title: 'ปรับรูปแนบ' }); if (!u) return;
+        const old = C.photos.find(p => p.id === img.dataset.pimg), id = uid('ct-');
+        newPhotos[id] = u; delete newPhotos[old.id]; old.id = id; drawPhotos(); preview(); return;
+      }
+      pickFor = x.dataset.pick; q('#c-pf').multiple = pickFor === 'other'; q('#c-pf').click();
+    });
     box.querySelectorAll('[data-prm]').forEach(x => x.onclick = e => { e.stopPropagation(); C.photos = C.photos.filter(p => p.id !== x.dataset.prm); delete newPhotos[x.dataset.prm]; drawPhotos(); preview(); });
   };
   const LBL = { meterE: 'มิเตอร์ไฟ', meterW: 'มิเตอร์น้ำ', fridge: 'ตู้เย็น' };
-  q('#c-pf').onchange = async e => {
-    for (const f of [...e.target.files]) {
-      const id = uid('ct-'), url = await compress(await fileToDataUrl(f));
+  const addPhotos = async files => {
+    for (const f of files) {
+      const id = uid('ct-'), url = await pick(f, `ปรับรูปแนบ${LBL[pickFor] ? ' · ' + LBL[pickFor] : ''}`);
+      if (!url) continue;
       newPhotos[id] = url;
       if (pickFor !== 'other') C.photos = C.photos.filter(p => p.tag !== pickFor);
       const item = { id, tag: pickFor === 'other' ? '' : pickFor, label: LBL[pickFor] || '' };
       // รูปมิเตอร์ไว้ก่อนรูปอื่น
       pickFor === 'other' ? C.photos.push(item) : C.photos.splice(['meterE', 'meterW', 'fridge'].indexOf(pickFor), 0, item);
     }
-    e.target.value = ''; drawPhotos(); preview();
+    drawPhotos(); preview();
   };
+  q('#c-pf').onchange = async e => { const fs = [...e.target.files]; e.target.value = ''; await addPhotos(fs); };
+  // ลากรูปมาวางที่ช่องรูปแนบ: วางบนช่องมิเตอร์/ตู้เย็น = ใส่ช่องนั้น · วางที่อื่น = รูปอื่นๆ
+  dropZone(q('#c-ph3'), fs => addPhotos(fs));
+  q('#c-ph3').addEventListener('drop', e => { pickFor = e.target.closest('[data-pick]')?.dataset.pick; if (!pickFor || pickFor === 'x') pickFor = 'other'; }, true);
   drawPhotos();
 
   // ---------- บันทึก ----------

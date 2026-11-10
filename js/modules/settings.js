@@ -143,21 +143,29 @@ export default {
     $e('#codes').onclick = async () => {
       // สร้างรหัสผูก LINE ให้ห้องที่ยังไม่มี: ห้องพัก/Kiosk ทุกห้อง + ห้องประเภทอื่นที่มีผู้เช่า (เช่น 102 ห้องซักผ้า)
       for (const r of M.rooms().filter(r => r.kind === 'room' || r.kind === 'kiosk' || M.tenantOf(r.id))) if (!r.lineCode) await db.put('rooms', { ...r, lineCode: randomString(6, '0123456789') });
-      const msgFor = r => `${M.property().name} — ห้อง ${r.id}\nรับบิลค่าเช่าทาง LINE: พิมพ์ข้อความนี้ส่งกลับมาในแชทนี้\n${r.id}-${r.lineCode}`;
+      // ข้อความชวนผู้เช่าผูก LINE (รหัสอยู่บรรทัดของตัวเอง — webhook รับได้แม้ผู้เช่าคัดลอกข้อความทั้งหมดส่งกลับมา)
+      const msgLines = r => [`สวัสดีค่ะ จาก ${M.property().name}`, `-- ติดต่อกับห้อง ${r.id} ค่ะ --`, 'รบกวนพิมพ์ตัวเลขด้านล่างส่งกลับมาเพื่อ ผูกกับ Bot ของอพาร์ทเม้นท์ค่ะ', '', `${r.id}-${r.lineCode}`];
+      const msgFor = r => msgLines(r).join('\n');
+      // แบบมีสี (รหัสสีแดง) สำหรับโปรแกรมที่รับข้อความมีรูปแบบ — แชท LINE จะแสดงเป็นตัวอักษรปกติ
+      const msgHtml = r => { const l = msgLines(r); return l.slice(0, -1).map(esc).join('<br>') + `<br><b style="color:#e00000">${esc(l[l.length - 1])}</b>`; };
       const box = openModal(`<h3>รหัสผูก LINE OA</h3><p class="note">ให้ผู้เช่าส่งข้อความ <b>เลขห้อง-รหัส</b> มาที่ LINE OA · กด 📋 เพื่อคัดลอกข้อความไปวางในแชทของผู้เช่า</p>
         <div class="scroll" style="max-height:50vh"><table class="tbl"><thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ข้อความที่ต้องส่ง</th><th>สถานะ</th><th></th></tr></thead><tbody>
-        ${M.rooms().filter(r => r.lineCode).map(r => { const l = M.lineLinkOf(r.id); return `<tr><td>${r.id}</td><td>${esc(M.tenantOf(r.id)?.name || '-')}</td><td><code>${r.id}-${r.lineCode}</code></td><td>${l ? '✅ ' + esc(l.displayName || '') : '-'}</td>
+        ${M.rooms().filter(r => r.lineCode).map(r => { const l = M.lineLinkOf(r.id); return `<tr><td>${r.id}</td><td>${esc(M.tenantOf(r.id)?.name || '-')}</td><td><code style="color:#e00000;font-weight:700">${r.id}-${r.lineCode}</code></td><td>${l ? '✅ ' + esc(l.displayName || '') : '-'}</td>
           <td><button class="btn sm" data-copy="${r.id}" title="คัดลอกข้อความพร้อมรหัส">📋 คัดลอก</button></td></tr>`; }).join('')}
         </tbody></table></div><div class="form-acts"><button class="btn" id="cx">ปิด</button><button class="btn pri" id="cp">พิมพ์ใบแจ้งรหัส</button></div>`, { wide: true });
       box.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
         const r = db.get('rooms', b.dataset.copy);
-        try { await navigator.clipboard.writeText(msgFor(r)); b.textContent = '✔ คัดลอกแล้ว'; toast(`คัดลอกข้อความห้อง ${r.id} แล้ว — ไปวางในแชท LINE ของผู้เช่าได้เลย`); }
+        try {
+          // คัดลอกแบบมีสีก่อน ถ้าเบราว์เซอร์ไม่ยอม ใช้ข้อความธรรมดา
+          try { await navigator.clipboard.write([new ClipboardItem({ 'text/plain': new Blob([msgFor(r)], { type: 'text/plain' }), 'text/html': new Blob([msgHtml(r)], { type: 'text/html' }) })]); }
+          catch { await navigator.clipboard.writeText(msgFor(r)); }
+          b.textContent = '✔ คัดลอกแล้ว'; toast(`คัดลอกข้อความห้อง ${r.id} แล้ว — ไปวางในแชท LINE ของผู้เช่าได้เลย`); }
         catch { toast('คัดลอกไม่ได้ — เลือกข้อความในช่องรหัสแล้วกด Ctrl+C แทน', 4000); }
       });
       box.querySelector('#cx').onclick = closeModal;
       box.querySelector('#cp').onclick = () => {
         printInFrame(M.rooms().filter(r => r.lineCode && M.tenantOf(r.id)).map(r => `<div class="bill"><h4>${esc(M.property().name)} — ห้อง ${r.id}</h4>
-          <p>รับบิลค่าเช่าทาง LINE: เพิ่มเพื่อน LINE OA ของอาคาร แล้วพิมพ์ข้อความนี้</p><p style="font-size:28px;font-family:monospace"><b>${r.id}-${r.lineCode}</b></p></div>`).join(''));
+          <p>รับบิลค่าเช่าทาง LINE: เพิ่มเพื่อน LINE OA ของอาคาร แล้วพิมพ์ข้อความนี้</p><p style="font-size:28px;font-family:monospace;color:#e00000"><b>${r.id}-${r.lineCode}</b></p></div>`).join(''));
       };
     };
     el.querySelectorAll('[data-room]').forEach(b => b.onclick = () => roomForm(db.get('rooms', b.dataset.room), re));
