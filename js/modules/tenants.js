@@ -243,10 +243,7 @@ export function openTenantForm(t, done) {
       if (b.wRate !== nr.water || b.eRate !== nr.elec) await db.put('bills', { ...b, wRate: nr.water, eRate: nr.elec });
     const miss = M.missingInfo(rec);
     stopCam(); closeModal();
-    toast((isNew ? `บันทึกผู้เช่าห้อง ${rec.room} แล้ว` : 'บันทึกการแก้ไขแล้ว') + (miss.length ? ` — ⚠️ ยังขาด: ${miss.join(', ')}` : ''), miss.length ? 5000 : 2500); done?.();
-    // ผู้เช่าเข้าใหม่ → ทำสัญญาเช่าต่อทันที (ข้อมูลจากที่เพิ่งกรอก)
-    if (isNew) import('./contract.js').then(m => m.openContract(rec, done));
-  };
+    toast((isNew ? `บันทึกผู้เช่าห้อง ${rec.room} แล้ว` : 'บันทึกการแก้ไขแล้ว') + (miss.length ? ` — ⚠️ ยังขาด: ${miss.join(', ')}` : ''), miss.length ? 5000 : 2500); done?.();  };
   $('#tdel')?.addEventListener('click', async () => {
     if (!await confirmBox(`ลบข้อมูลผู้เช่า ${t.name} ห้อง ${t.room}? (ใช้กรณีบันทึกผิด ถ้าย้ายออกให้ใช้ "ย้ายออก")`, 'ลบ')) return;
     await db.remove('tenants', t.id); toast('ลบข้อมูลแล้ว'); done?.();
@@ -420,7 +417,8 @@ export default {
     const qi = el.querySelector('#q');
     qi.oninput = () => { q = qi.value; re(); const n = el.querySelector('#q'); n.focus(); n.setSelectionRange(q.length, q.length); };
     el.querySelectorAll('[data-flt]').forEach(b => b.onclick = () => { filter = b.dataset.flt; re(); });
-    el.querySelector('#add').onclick = () => openTenantForm({}, re);
+    // ผู้เช่าเข้าใหม่ = หน้าต่างทำสัญญา (กรอกครั้งเดียว ได้ทั้งข้อมูลผู้เช่าและสัญญา)
+    el.querySelector('#add').onclick = () => import('./contract.js').then(m => m.openContract({}, re));
     el.querySelectorAll('[data-t]').forEach(tr => tr.onclick = () => {
       const t = db.get('tenants', tr.dataset.t);
       t.active ? nav.go('floorplan', { room: t.room }) : openTenantHistory(t, re);

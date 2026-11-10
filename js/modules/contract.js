@@ -42,9 +42,17 @@ const CSS = `
 `;
 const FRIDGE = `<svg width="30" height="38" viewBox="0 0 38 46" aria-hidden="true"><defs><linearGradient id="fzf" x1="0" x2="1"><stop offset="0" stop-color="#ff9a7a"/><stop offset=".55" stop-color="#f4643f"/><stop offset="1" stop-color="#e2502d"/></linearGradient><linearGradient id="fzc" x1="0" x2="1"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#c9d1d8"/><stop offset="1" stop-color="#8d99a4"/></linearGradient></defs><ellipse cx="18" cy="43.2" rx="15" ry="2.2" opacity=".16"/><path d="M27 4 L33 1.5 V38 L27 41 Z" fill="#b73a1d"/><path d="M4 4 L10 1.5 H33 L27 4 Z" fill="#ffb59e"/><rect x="4" y="4" width="23" height="37" rx="2.2" fill="url(#fzf)"/><rect x="4" y="16" width="23" height="1.6" fill="#a8341a"/><rect x="21.5" y="7" width="2.4" height="6.5" rx="1.2" fill="url(#fzc)"/><rect x="21.5" y="20" width="2.4" height="11" rx="1.2" fill="url(#fzc)"/></svg>`;
 
-export async function openContract(tIn, done) {
-  let t = db.get('tenants', tIn.id) || tIn;
-  const C = { ...K.defaults(t), ...(t.contract || {}) };
+// tIn = ผู้เช่าเดิม (ทำสัญญาใหม่ / พิมพ์ซ้ำ) หรือ { room } = ผู้เช่าเข้าใหม่: กรอกครั้งเดียวในหน้าต่างนี้ บันทึกแล้วได้ทั้งข้อมูลผู้เช่าและสัญญา
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export async function openContract(tIn = {}, done) {
+  let isNew = !(tIn.id && db.get('tenants', tIn.id));
+  const vacant = M.rooms().filter(r => !M.tenantOf(r.id));
+  if (isNew && !vacant.length) return toast('ไม่มีห้องว่าง');
+  const blank = room => { const r = db.get('rooms', room) || {}; const rent = Number(r.rent) || 0;
+    return { id: uid('t-'), room, rent, deposit: rent, fridge: 0, parkingFee: 0, occupants: [], lang: 'th', since: todayIso(), active: true }; };
+  const firstRoom = (vacant.find(r => r.kind === 'room') || vacant[0]).id;   // ห้องพักว่างห้องแรก (ไม่ใช่สำนักงาน/ซักผ้า)
+  let t = isNew ? { ...blank(vacant.some(r => r.id === tIn.room) ? tIn.room : firstRoom), ...tIn, id: uid('t-') } : db.get('tenants', tIn.id);
+  const C = { ...K.defaults(t), birthDate: t.birthDate || '', address: t.address || '', ...(t.contract || {}) };
   C.extras = (C.extras || []).map(x => ({ ...x }));
   C.photos = (C.photos || []).map(x => ({ ...x }));
   const maxOcc = Number(M.rates().maxOccupants ?? 2);
@@ -54,7 +62,8 @@ export async function openContract(tIn, done) {
   const cache = {};                 // id → dataUrl (แสดงตัวอย่าง)
 
   const field = (k, label, cls = 'f-blue', attrs = '') => `<div><label class="l">${label}</label><input class="${cls}" data-k="${k}" value="${esc(C[k] ?? '')}" ${attrs}></div>`;
-  const box = openModal(`<style>${CSS}</style><h3 style="margin-bottom:6px">📝 สัญญาเช่า · ห้อง ${esc(t.room)}</h3>
+  const title = () => `${isNew ? '🏠 ผู้เช่าเข้าใหม่ · ทำสัญญาเช่า' : '📝 สัญญาเช่า'} · ห้อง ${esc(C.room)}`;
+  const box = openModal(`<style>${CSS}</style><h3 style="margin-bottom:6px" id="c-title">${title()}</h3>
     <div class="ctm"><div class="frm" id="cf">
       <label class="lang"><span><b>🌐 ผู้เช่าเป็นชาวต่างชาติ</b><small>เปิด = สัญญาภาษาอังกฤษ · อ่าน Passport แทนบัตรประชาชน</small></span>
         <span class="sw"><input type="checkbox" id="c-en" ${C.lang === 'en' ? 'checked' : ''}><span></span></span></label>
@@ -67,18 +76,21 @@ export async function openContract(tIn, done) {
           <div class="full"><label class="l">🔐 รหัสเครื่องสแกนใบหน้า</label><input class="f-blue" data-k="faceCode" value="${esc(C.faceCode)}" placeholder="รหัสสำหรับลงทะเบียนสแกนใบหน้า"></div>
           <div class="full"><label class="l" id="c-nml">${C.lang === 'en' ? 'ชื่อ-นามสกุล (ภาษาอังกฤษ ตาม Passport)' : 'ชื่อ-นามสกุล ผู้เช่า (= ผู้ลงลายมือชื่อ)'}</label><input class="f-blue" data-k="tenantName" value="${esc(C.tenantName)}"></div>
           ${field('tenantId', C.lang === 'en' ? 'เลข Passport' : 'เลขบัตรประชาชน')}${field('phone', 'เบอร์โทร')}
+          ${field('birthDate', 'วันเดือนปีเกิด', 'f-blue', `type="date" max="${todayIso()}"`)}
+          <div class="full"><label class="l">ที่อยู่ (ตามบัตร)</label><input class="f-blue" data-k="address" value="${esc(C.address)}"></div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px"><b style="font-size:13.5px">ผู้อาศัยร่วม <span class="note">(ไม่เกิน ${maxOcc} คน)</span></b><button class="btn sm" type="button" id="c-occadd">+ เพิ่มผู้อาศัย</button></div>
         <div id="c-occs"></div>
       </div>
       <div class="sec"><h4>🏠 2. รายละเอียดสัญญา <small>เติมจากข้อมูลผู้เช่าให้ก่อน แก้ได้</small></h4>
         <div class="g2">
-          <div><label class="l">ห้อง</label><input class="f-red" value="${esc(t.room)}" disabled></div>
+          <div><label class="l">ห้อง</label>${isNew ? `<select class="f-red" id="c-room">${vacant.map(r => `<option ${r.id === C.room ? 'selected' : ''}>${r.id}</option>`).join('')}</select>` : `<input class="f-red" value="${esc(C.room)}" disabled>`}</div>
           ${field('date', 'วันที่ทำสัญญา', 'f-blue', 'type="date"')}
           <div><label class="l">จำนวนผู้พักอาศัย (คน)</label><input class="f-blue" id="c-occn" disabled><div class="auto">อัตโนมัติ: ผู้เช่า + ผู้อาศัยร่วม</div></div>
           ${field('minMonths', 'สัญญาขั้นต่ำ (เดือน)', 'f-red', 'inputmode="numeric"')}
           <div>${field('rent', 'ค่าเช่า/เดือน (บาท)', 'f-red', 'inputmode="numeric"').slice(5, -6)}<div class="auto" id="c-words"></div></div>
           ${field('firstMonth', 'ค่าเช่าเดือนแรก: เดือน', 'f-lblue', 'type="month"')}
+          ${field('eRate', '⚡ ค่าไฟ (บาท/หน่วย)', 'f-blue', 'inputmode="decimal"')}${field('wRate', '💧 ค่าน้ำ (บาท/หน่วย)', 'f-blue', 'inputmode="decimal"')}
           <div class="full"><label class="l">4.1 คิดค่าเช่าเดือนแรกแบบ</label><div class="seg" id="c-mode"><button type="button" data-m="month">เต็มเดือน</button><button type="button" data-m="day">คิดรายวัน (ตามวันเข้าพัก)</button></div></div>
           <div class="dayrow">${field('moveIn', 'วันเข้าพัก', 'f-blue', 'type="date"').slice(5, -6)}</div>
           <div class="dayrow">${field('firstDays', 'จำนวนวัน', 'f-blue', 'inputmode="numeric"').slice(5, -6)}<div class="auto">อัตโนมัติ: ถึงสิ้นเดือน · แก้ได้</div></div>
@@ -98,13 +110,14 @@ export async function openContract(tIn, done) {
         <div class="thumbs" id="c-ph3"></div>
         <input id="c-pf" type="file" accept="image/*" multiple hidden>
       </div>
+      <p class="note" style="margin:0 0 8px">ช่องจอดรถ (เลือกช่อง/ทะเบียน) ค่าเช่าล่วงหน้า และหมายเหตุ แก้เพิ่มได้ที่ปุ่ม "แก้ไขผู้เช่า" ในผังห้อง</p>
       <div class="err" id="c-err"></div>
     </div>
     <div class="pv"><div class="zm" id="c-pv"><p class="note" style="padding:20px">กำลังสร้างตัวอย่างสัญญา…</p></div></div></div>
     <div class="form-acts">
       <button class="btn" id="c-x">ปิด</button><button class="btn" id="c-save">💾 บันทึก</button>
       <button class="btn" id="c-word">📄 Word</button><button class="btn" id="c-pdf">📕 PDF</button><button class="btn pri" id="c-print">🖨️ พิมพ์</button>
-      <button class="btn line" id="c-line" ${M.lineLinkOf(t.room) ? '' : `title="ห้อง ${esc(t.room)} ยังไม่ผูก LINE OA"`}>💬 ส่ง LINE</button></div>`, { wide: true });
+      <button class="btn line" id="c-line" ${M.lineLinkOf(C.room) ? '' : `title="ห้อง ${esc(C.room)} ยังไม่ผูก LINE OA"`}>💬 ส่ง LINE</button></div>`, { wide: true });
   box.style.maxWidth = '1320px'; box.style.width = '96vw';
   const q = s => box.querySelector(s);
   const inp = k => box.querySelector(`[data-k="${k}"]`);
@@ -151,6 +164,16 @@ export async function openContract(tIn, done) {
     if (C.mode === 'day' && k === 'firstDays') { const p = K.prorate(C.rent, C.moveIn); if (p) setVal('firstAmount', String(Math.round(Number(C.rent) / p.dim * (Number(C.firstDays) || 0)))); }
     calc();
   });
+  // ผู้เช่าเข้าใหม่: เปลี่ยนห้อง → ค่าเช่า ประกัน อัตราน้ำไฟ และเลขมิเตอร์ตามห้องใหม่
+  q('#c-room')?.addEventListener('change', e => {
+    const d = K.defaults({ ...t, room: e.target.value, rent: Number(db.get('rooms', e.target.value)?.rent) || 0, wRate: null, eRate: null });
+    C.room = t.room = e.target.value;
+    for (const k of ['rent', 'deposit', 'firstAmount', 'wRate', 'eRate', 'meterE', 'meterW']) setVal(k, String(d[k] ?? ''));
+    if (C.mode === 'day') reprorate();
+    q('#c-title').innerHTML = title();
+    q('#c-line').title = M.lineLinkOf(C.room) ? '' : `ห้อง ${C.room} ยังไม่ผูก LINE OA`;
+    calc();
+  });
   box.querySelectorAll('#c-mode button').forEach(b => b.onclick = () => { C.mode = b.dataset.m; if (C.mode === 'day') reprorate(); else { setVal('firstDays', ''); setVal('firstAmount', C.rent); setVal('firstMonth', (C.moveIn || C.date).slice(0, 7)); } calc(); });
   q('#c-en').onchange = e => {
     C.lang = e.target.checked ? 'en' : 'th';
@@ -177,6 +200,7 @@ export async function openContract(tIn, done) {
     newId = await compress(await fileToDataUrl(f)); showIdThumb(newId); preview();
     readCard(newId, r => {
       if (r.name) setVal('tenantName', r.name); if (r.idNo) setVal('tenantId', r.idNo);
+      if (r.birthDate) setVal('birthDate', r.birthDate); if (r.address) setVal('address', r.address);
       if (r.type === 'passport' && r.nationality && r.nationality !== 'THA' && C.lang !== 'en') { q('#c-en').checked = true; q('#c-en').onchange({ target: q('#c-en') }); }
       calc();
     }, q('#c-idmsg'));
@@ -241,8 +265,9 @@ export async function openContract(tIn, done) {
 
   // ---------- บันทึก ----------
   const save = async () => {
-    if (!String(C.tenantName).trim()) { q('#c-err').textContent = 'กรุณากรอกชื่อผู้เช่า'; return false; }
-    const rec = { ...db.get('tenants', t.id) || t };
+    if (!String(C.tenantName).trim()) { q('#c-err').textContent = 'กรุณากรอกชื่อผู้เช่า'; q('[data-k=tenantName]').focus(); return false; }
+    if (isNew && M.tenantOf(C.room)) { q('#c-err').textContent = `ห้อง ${C.room} มีผู้เช่าแล้ว กรุณาเลือกห้องอื่น`; return false; }
+    const rec = { ...db.get('tenants', t.id) || t, room: C.room };
     if (newId) {
       const pid = uid('id-');
       await db.putPhoto({ id: pid, dataUrl: newId, name: `${rec.room}-${C.tenantName}-บัตรประชาชน.jpg`, tenantId: rec.id, createdAt: new Date().toISOString() });
@@ -266,8 +291,20 @@ export async function openContract(tIn, done) {
     // ข้อมูลในสัญญาที่ตรงกับข้อมูลผู้เช่า → อัปเดตผู้เช่าให้ตรงกัน
     Object.assign(rec, { name: C.tenantName.trim(), idNo: String(C.tenantId).trim(), phone: String(C.phone).trim(), faceCode: String(C.faceCode || '').trim(), lang: C.lang,
       occupants: outOcc, rent: Number(C.rent) || 0, deposit: Number(C.deposit) || 0, fridge: Number(C.fridgeFee) || 0,
+      birthDate: C.birthDate || '', address: String(C.address || '').trim(),
+      wRate: C.wRate === '' ? null : Number(C.wRate), eRate: C.eRate === '' ? null : Number(C.eRate),
       contract: { ...C, savedAt: new Date().toISOString() } });
+    if (isNew) {
+      // ผู้เช่าเข้าใหม่: วันเข้าพัก = วันเข้าพักในสัญญา · ค่าที่จอดรายเดือนจากรายการ "ค่าที่จอด…" ในค่าเช่าอื่นๆ
+      rec.active = true; rec.since = C.moveIn || C.date;
+      rec.parkingFee = C.extras.filter(x => /จอด|park/i.test(x.name)).reduce((a, x) => a + (Number(x.amt) || 0), 0);
+    }
     await db.put('tenants', rec); t = rec; drawOccs();
+    if (isNew) {
+      isNew = false; q('#c-title').innerHTML = title();
+      const sel = q('#c-room'); if (sel) sel.disabled = true;
+      toast(`บันทึกผู้เช่าห้อง ${rec.room} แล้ว`);
+    }
     q('#c-err').textContent = '';
     return true;
   };

@@ -137,7 +137,7 @@ export default {
     act('bill')?.addEventListener('click', () => nav.go('billing', { room: sel }));
     act('edit')?.addEventListener('click', () => openTenantForm(t, () => this.render(el, nav)));
     act('fill')?.addEventListener('click', e => { e.preventDefault(); openTenantForm(t, () => this.render(el, nav)); });
-    act('in')?.addEventListener('click', () => openTenantForm({ room: sel }, () => this.render(el, nav)));
+    act('in')?.addEventListener('click', () => import('./contract.js').then(m => m.openContract({ room: sel }, () => this.render(el, nav))));
     act('out')?.addEventListener('click', () => moveOut(t, () => this.render(el, nav)));
     act('contract')?.addEventListener('click', () => import('./contract.js').then(m => m.openContract(t, () => this.render(el, nav))));
     act('lastbill')?.addEventListener('click', () => {
