@@ -87,7 +87,7 @@ export function parseSlipText(raw) {
 
 // ---------- OCR ในเครื่อง (ฟรี, Tesseract.js) — โหลดครั้งแรกจากอินเทอร์เน็ต แล้วใช้ offline ได้ ----------
 let tessWorker;
-const loadTesseract = () => new Promise((res, rej) => {
+export const loadTesseract = () => new Promise((res, rej) => {
   if (window.Tesseract) return res(window.Tesseract);
   const s = document.createElement('script');
   s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';

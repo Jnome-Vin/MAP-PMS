@@ -106,7 +106,7 @@ export default {
           <label>PromptPay</label><input id="ppp" value="${esc(p.promptpay)}">
           <label>หมายเหตุบิล (ไทย)</label><input id="pnote" value="${esc(p.billNote)}">
           <label>หมายเหตุบิล (อังกฤษ)</label><input id="pnoteen" value="${esc(p.billNoteEn)}">
-          <label>อ่านสลิปด้วย Claude</label><label style="color:inherit"><input type="checkbox" id="pclaude" ${p.claudeSlip ? 'checked' : ''} style="width:auto"> แสดงปุ่ม "🤖 Claude อ่าน" (แม่นกว่า มีค่าใช้จ่าย · ต้องใส่ API key ในชีต) — ปกติใช้แบบฟรี</label>
+          <label>อ่านสลิปด้วย Claude</label><label style="color:inherit"><input type="checkbox" id="pclaude" ${p.claudeSlip ? 'checked' : ''} style="width:auto"> แสดงปุ่ม "🤖 Claude อ่าน" สำหรับสลิปและเลขมิเตอร์ (แม่นกว่า มีค่าใช้จ่าย · ต้องใส่ API key ในชีต) — ปกติใช้แบบฟรี</label>
           <label>QR ชำระเงินบนบิล</label><label style="color:inherit"><input type="checkbox" id="pqr" ${p.showQr !== false ? 'checked' : ''} style="width:auto"> แสดง (ไฟล์ app/assets/payment-qr.png)</label>
         </form>
         <div class="form-acts"><button class="btn pri" id="saveProp">บันทึก</button></div></div>

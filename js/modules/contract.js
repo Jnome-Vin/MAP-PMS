@@ -7,6 +7,7 @@ import { readIdDocument, occ as occOf } from '../core/idcard.js';
 import * as K from '../core/contract.js';
 import { compress, fileToDataUrl } from './tenants.js';
 import { editImage, dropZone } from '../core/imgedit.js';
+import { readMeter, canUseClaude } from '../core/meter.js';
 
 const CSS = `
 .ctm{display:grid;grid-template-columns:minmax(360px,440px) 1fr;gap:14px;align-items:start}
@@ -107,7 +108,8 @@ export async function openContract(tIn = {}, done) {
           ${field('motoFee', '4.5 ค่ากุญแจ (บาท)', 'f-blue', 'inputmode="numeric"')}
           <div><label class="l">กุญแจห้อง / ห้องน้ำ (ดอก)</label><div style="display:flex;gap:6px"><input class="f-blue" data-k="keyRoom" value="${esc(C.keyRoom)}"><input class="f-blue" data-k="keyBath" value="${esc(C.keyBath)}"></div></div>
           <div class="full"><div style="display:flex;justify-content:space-between;align-items:center"><label class="l" style="margin:0">ค่าเช่าอื่นๆ (4.6 เป็นต้นไป)</label><button class="btn sm" type="button" id="c-xadd">+ เพิ่มค่าเช่าอื่น</button></div><div id="c-xs"></div><div class="auto">เช่น ค่าที่จอดรถยนต์ · รวมในยอดข้อ 2 ให้อัตโนมัติ</div></div>
-          ${field('meterE', 'มิเตอร์ไฟเริ่มต้น', 'f-orange', 'inputmode="numeric" placeholder="จดวันเข้าพัก"')}${field('meterW', 'มิเตอร์น้ำเริ่มต้น', 'f-lblue', 'inputmode="numeric" placeholder="จดวันเข้าพัก"')}
+          ${field('meterE', 'มิเตอร์ไฟเริ่มต้น', 'f-orange', 'inputmode="numeric" placeholder="จดวันเข้าพัก"').slice(0, -6)}<div class="auto" id="c-m-meterE">แนบรูปมิเตอร์ไฟ (ข้อ 3) → อ่านเลขให้อัตโนมัติ</div></div>
+          ${field('meterW', 'มิเตอร์น้ำเริ่มต้น', 'f-lblue', 'inputmode="numeric" placeholder="จดวันเข้าพัก"').slice(0, -6)}<div class="auto" id="c-m-meterW">แนบรูปมิเตอร์น้ำ (ข้อ 3) → อ่านเลขให้อัตโนมัติ</div></div>
           <div class="full"><label class="l">ยอดรวมวันทำสัญญา (ข้อ 2)</label><input class="f-red" id="c-total" disabled><div class="auto">อัตโนมัติ = 4.1 + 4.2 + 4.3 + 4.4 + 4.5 + ค่าเช่าอื่นๆ</div></div>
         </div>
       </div>
@@ -280,7 +282,9 @@ export async function openContract(tIn = {}, done) {
       if (img) {   // กดรูปที่มีอยู่ → ปรับรูป (หมุน / ครอป) แล้วแทนรูปเดิม
         const u = await editImage(img.src, { title: 'ปรับรูปแนบ' }); if (!u) return;
         const old = C.photos.find(p => p.id === img.dataset.pimg), id = uid('ct-');
-        newPhotos[id] = u; delete newPhotos[old.id]; old.id = id; drawPhotos(); preview(); return;
+        newPhotos[id] = u; delete newPhotos[old.id]; old.id = id; drawPhotos(); preview();
+        if (old.tag === 'meterE' || old.tag === 'meterW') runMeter(old.tag, u);
+        return;
       }
       pickFor = x.dataset.pick; q('#c-pf').multiple = pickFor === 'other'; q('#c-pf').click();
     });
@@ -296,9 +300,36 @@ export async function openContract(tIn = {}, done) {
       const item = { id, tag: pickFor === 'other' ? '' : pickFor, label: LBL[pickFor] || '' };
       // รูปมิเตอร์ไว้ก่อนรูปอื่น
       pickFor === 'other' ? C.photos.push(item) : C.photos.splice(['meterE', 'meterW', 'fridge'].indexOf(pickFor), 0, item);
+      if (pickFor === 'meterE' || pickFor === 'meterW') runMeter(pickFor, url);
     }
     drawPhotos(); preview();
   };
+  // อ่านเลขมิเตอร์จากรูป → ใส่ในช่องให้ (แก้ได้) · เทียบกับเลขครั้งก่อนของห้อง
+  // ปกติอ่านด้วยตัวอ่านฟรีในเครื่อง · ปุ่ม "ให้ Claude อ่าน" (มีค่าใช้จ่าย) แสดงเฉพาะเมื่อเปิดไว้ในตั้งค่า และกดเองเท่านั้น
+  const prevMeter = { meterE: C.meterE, meterW: C.meterW }, meterSeq = {}, meterUrl = {};
+  const aiBtn = tag => (M.property().claudeSlip && canUseClaude()
+    ? ` <button type="button" class="btn sm" data-mai="${tag}" title="แม่นกว่า มีค่าใช้จ่ายเล็กน้อยต่อรูป">🤖 ให้ Claude อ่าน</button>` : '');
+  const runMeter = async (tag, url, ai = false) => {
+    meterUrl[tag] = url;
+    const st = q(`#c-m-${tag}`), seq = meterSeq[tag] = (meterSeq[tag] || 0) + 1, before = String(C[tag] ?? '');
+    if (st) st.innerHTML = ai ? '🤖 Claude กำลังอ่านเลขมิเตอร์…' : '🔍 กำลังอ่านเลขมิเตอร์จากรูป (ฟรี)…';
+    let r;
+    try { r = await readMeter(url, tag === 'meterE' ? 'electric' : 'water', { ai }); }
+    catch (e) { if (seq === meterSeq[tag] && st) { st.innerHTML = `อ่านเลขไม่สำเร็จ (${esc(e.message)}) — กรุณากรอกเอง${aiBtn(tag)}`; bindAi(); } return; }
+    if (seq !== meterSeq[tag] || !q(`#c-m-${tag}`)) return;
+    if (r.notMeter) { st.innerHTML = '<span style="color:#b45309">⚠️ รูปนี้ไม่น่าจะเป็นมิเตอร์ — กรุณาตรวจรูปหรือกรอกเอง</span>'; return; }
+    if (!r.reading) { st.innerHTML = `<span style="color:#b45309">อ่านเลขจากรูปไม่ออก — กรุณากรอกเอง</span>${ai ? '' : aiBtn(tag)}`; bindAi(); return; }
+    if (String(C[tag] ?? '') !== before) { st.innerHTML = `อ่านจากรูปได้ <b>${esc(r.reading)}</b> — ไม่ได้ใส่ให้ เพราะแก้ช่องนี้ระหว่างอ่าน`; return; }
+    setVal(tag, r.reading); dirty = true; preview();
+    const prev = Number(prevMeter[tag]), hasPrev = prevMeter[tag] !== '' && Number.isFinite(prev), v = Number(r.reading);
+    const low = hasPrev && v < prev, high = hasPrev && v > prev * 2 + 1000;
+    st.innerHTML = `${ai ? '🤖' : '🔍'} อ่านจากรูปได้ <b>${esc(r.reading)}</b> ${ai ? '(Claude)' : '(ตัวอ่านฟรีในเครื่อง)'} · <b>ตรวจกับรูปแล้วแก้ได้</b>${ai ? '' : aiBtn(tag)}`
+      + (r.unclear && ai ? '<br><span style="color:#b45309">⚠️ บางหลักไม่ชัด กรุณาตรวจ</span>' : '')
+      + (low ? `<br><span style="color:#c00">⚠️ น้อยกว่าเลขครั้งก่อนของห้องนี้ (${esc(prevMeter[tag])}) — ตรวจอีกครั้ง</span>` : '')
+      + (high ? `<br><span style="color:#c00">⚠️ สูงกว่าเลขครั้งก่อนของห้องนี้ (${esc(prevMeter[tag])}) มากผิดปกติ — ตรวจอีกครั้ง</span>` : '');
+    bindAi();
+  };
+  const bindAi = () => box.querySelectorAll('[data-mai]').forEach(b => b.onclick = () => meterUrl[b.dataset.mai] && runMeter(b.dataset.mai, meterUrl[b.dataset.mai], true));
   q('#c-pf').onchange = async e => { const fs = [...e.target.files]; e.target.value = ''; await addPhotos(fs); };
   // ลากรูปมาวางที่ช่องรูปแนบ: วางบนช่องมิเตอร์/ตู้เย็น = ใส่ช่องนั้น · วางที่อื่น = รูปอื่นๆ
   dropZone(q('#c-ph3'), fs => addPhotos(fs));
