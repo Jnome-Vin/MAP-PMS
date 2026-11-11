@@ -118,7 +118,7 @@ function contentTH(C, x) {
     ...checklist(C, { title: 'รายการตรวจสภาพห้องก่อนเช่า ห้อง', before: 'ก่อนเช่า', after: 'หลังเช่า', date: 'ตรวจสภาพวันที่', bed: 'ห้องนอน', bath: 'ห้องน้ำ', bal: 'ระเบียง',
       hint: '** ใส่ตัวเลขจุดที่ไม่ปกติ และเขียนตัวเลข พร้อมคำอธิบายความผิดปกติ ในช่องว่าง', ok: 'ปกติ', ng: 'ไม่ปกติ', tenant: 'ผู้เช่า', insp: 'ผู้ตรวจ',
       items: ['2.ระบบไฟฟ้า', '3.ระบบประปา และสุขภัณฑ์', '4.ระบบโทรทัศน์', '5.ระบบสุขภัณฑ์', '6.ประตูห้อง', '7.มุ้งลวด', '8.ม่าน', '9.แอร์', '10. ................'] }),
-    ...attachments(x, 'รูปแนบ'),
+    ...attachments(x, 'รูปแนบ', C),
   ];
 }
 
@@ -173,7 +173,7 @@ function contentEN(C, x) {
     ...checklist(C, { title: 'Pre-rental Room Inspection Form – Room', before: 'Before rental', after: 'After rental', date: 'Inspection date', bed: 'Bedroom', bath: 'Bathroom', bal: 'Balcony',
       hint: '** Number each abnormal point and write the number with a description of the problem in the space provided', ok: 'Normal', ng: 'Abnormal', tenant: 'Lessee', insp: 'Inspector',
       items: ['2. Electrical system', '3. Plumbing and sanitary ware', '4. TV system', '5. Sanitary fixtures', '6. Room door', '7. Insect screens', '8. Curtains', '9. Air conditioner', '10. ................'] }, true),
-    ...attachments(x, 'Attachments'),
+    ...attachments(x, 'Attachments', C),
   ];
 }
 
@@ -202,13 +202,42 @@ function checklist(C, t, en) {
     { k: 'insp', roles: [t.tenant, t.insp] },
   ];
 }
-// รูปแนบ: บัตรผู้เช่า + ผู้อาศัย (ขนาดสัดส่วนบัตรจริง) แล้วต่อด้วยรูปอื่น หน้าแรก 4 รูป หน้าถัดไปหน้าละ 4 รูป
-function attachments(x, title) {
+// รูปแนบ: บัตรผู้เช่า + ผู้อาศัย (ขนาดสัดส่วนบัตรจริง) อยู่บนสุดของหน้าแรก แล้วต่อด้วยรูปอื่นแบบ "วางอิสระ"
+// ตำแหน่งรูป lay = { pg: หน้าที่ (0 = หน้าแรก), x, y: มม. จากมุมซ้ายบนของพื้นที่วางรูป, w: กว้าง มม. } เก็บใน C.photos[i].lay
+// รูปที่ยังไม่เคยจัด → จัดให้อัตโนมัติ (หน้าละ 2 แถว × 2 รูป ชิดฐาน) · C.attPages = จำนวนหน้ารูปที่ผู้ใช้เพิ่มเอง
+export const AREA_W = 170, CAP = 8;
+const AREA_H = 232;
+const areaH0 = n => (n ? Math.max(0, 225 - Math.ceil(n / 2) * 75) : AREA_H);
+function autoLayout(items, start, hFirst) {
+  const cfg = h => { const two = (h - 2 * CAP - 6) / 2; return two >= 45 ? { rows: 2, ch: two } : h - CAP - 2 >= 35 ? { rows: 1, ch: h - CAP - 2 } : { rows: 0 }; };
+  const out = []; let pg = start, slot = 0, c = cfg(hFirst);
+  for (const p of items) {
+    while (!c.rows || slot >= c.rows * 2) { pg++; slot = 0; c = cfg(AREA_H); }
+    const r = Math.floor(slot / 2), col = slot % 2, cw = 82, w = Math.min(cw, c.ch / p.ar), h = w * p.ar;
+    out.push({ pg, x: col * (cw + 6) + (cw - w) / 2, y: r * (c.ch + CAP + 6) + (c.ch - h), w });
+    slot++;
+  }
+  return out;
+}
+const clampLay = (l, ar, H) => {
+  const w = Math.min(AREA_W, Math.max(20, Number(l.w) || 60)), h = w * ar + CAP;
+  return { pg: Math.max(0, Math.floor(Number(l.pg) || 0)), w, x: Math.min(AREA_W - w, Math.max(0, Number(l.x) || 0)), y: Math.min(Math.max(0, H - h), Math.max(0, Number(l.y) || 0)) };
+};
+function attachments(x, title, C = {}) {
   const ids = x.ids || [], photos = x.photos || [];
   if (!ids.length && !photos.length) return [];
-  const out = [], first = photos.slice(0, ids.length ? 4 : 4), rest = photos.slice(first.length);
-  out.push({ k: 'page', tag: 'att' }, { k: 'att', title, ids, photos: first, tall: !ids.length, codeLbl: x.codeLbl });
-  for (let i = 0; i < rest.length; i += 4) out.push({ k: 'page', tag: 'att' }, { k: 'att', title, ids: [], photos: rest.slice(i, i + 4), tall: true });
+  const H0 = areaH0(ids.length), Hof = pg => (pg ? AREA_H : H0);
+  const placed = photos.filter(p => p.lay), loose = photos.filter(p => !p.lay);
+  let nPg = Math.max(1, Number(C.attPages) || 0, ...placed.map(p => (Number(p.lay.pg) || 0) + 1));
+  const start = placed.length ? nPg : 0, auto = autoLayout(loose, start, Hof(start));
+  nPg = Math.max(nPg, ...auto.map(l => l.pg + 1));
+  const all = [...placed.map(p => ({ ...p, lay: clampLay(p.lay, p.ar, Hof(Number(p.lay.pg) || 0)) })), ...loose.map((p, i) => ({ ...p, lay: auto[i] }))];
+  const out = [];
+  for (let pg = 0; pg < nPg; pg++) {
+    const ph = all.filter(p => p.lay.pg === pg), id = pg ? [] : ids;
+    // หน้าว่าง (เพิ่มไว้แต่ยังไม่มีรูป) แสดงเฉพาะในหน้าต่างจัดรูป ไม่พิมพ์ออก
+    out.push({ k: 'page', tag: 'att', editOnly: !ph.length && !id.length }, { k: 'att', title, ids: id, photos: ph, pg, H: Hof(pg), codeLbl: x.codeLbl });
+  }
   return out;
 }
 
@@ -255,7 +284,11 @@ export async function build(C, t, { forLine = false, getPhoto = null } = {}) {
   }
   const EN_LBL = { meterE: 'Electricity meter', meterW: 'Water meter', fridge: 'Refrigerator' };
   // pi = ลำดับใน C.photos (ใช้สลับตำแหน่ง / แก้คำอธิบายใต้ภาพ) · custom = ผู้ใช้พิมพ์คำอธิบายเอง
-  for (const [pi, p] of (C.photos || []).entries()) { const u = await photoData(p.id); if (u) x.photos.push({ url: u, pi, label: p.custom ? p.label || '' : (en && EN_LBL[p.tag]) || p.label || '' }); }
+  for (const [pi, p] of (C.photos || []).entries()) {
+    const u = await photoData(p.id); if (!u) continue;
+    const [w, h] = await imgSize(u);
+    x.photos.push({ url: u, pi, ar: h / w || 0.75, lay: p.lay || null, label: p.custom ? p.label || '' : (en && EN_LBL[p.tag]) || p.label || '' });
+  }
   return { blocks: en ? contentEN(C, x) : contentTH(C, x), en };
 }
 
@@ -307,10 +340,13 @@ const CSS = `
 .ct-att .im.id{height:auto;aspect-ratio:85.6/54}.ct-att .im.tall{height:110mm}
 .ct-att img{max-width:100%;max-height:100%;object-fit:contain}
 .ct-att figcaption{font-size:14px;color:#000;margin-top:1mm;line-height:1.35}
+.ct-free{position:relative;width:170mm}
+.ct-fp{position:absolute;margin:0}.ct-fim{position:relative}.ct-fim img{width:100%;display:block}
+.ct-fcap,.ct-in.cap{font-size:14px;line-height:1.3;text-align:center;color:#000;height:7mm;margin-top:1mm;white-space:nowrap;overflow:hidden}
 .ct-ln,.ct-cl .ln{display:flex;align-items:flex-end}
 .ct-tx,.ct-in{font:inherit;font-size:14px;line-height:1.2;color:#0070C0;padding:0 3px 1px;white-space:nowrap;overflow:hidden;width:100%;text-align:left}
 .ct-in{border:0;background:#fff7cc;outline:none;border-radius:3px 3px 0 0}.ct-in:focus{background:#ffe98a}
-.ct-in.cap{color:#000;text-align:center;border-bottom:1px dotted #999;margin-top:1mm;width:90%}
+.ct-in.cap{display:block;border-bottom:1px dotted #999;padding:0 2px}
 @media screen{.ct-pg{margin:12px auto;box-shadow:0 2px 12px rgba(0,0,0,.14)}}
 `;
 const cls = r => [r.c ? 'c-' + r.c : '', r.dots ? 'dots' : ''].filter(Boolean).join(' ');
@@ -335,6 +371,8 @@ const runHtml = (r, j) => {
   const c = cls(r); return c ? `<span class="${c}">${h}</span>` : h;
 };
 const runsHtml = (rs, j) => rs.map(r => runHtml(r, j)).join('');
+// กรอบคำอธิบายใต้ภาพ: กว้างอย่างน้อย 60 มม. กึ่งกลางรูป ไม่ล้นพื้นที่ (cl = ซ้ายของกรอบ มม.)
+const capBox = ({ x, w }) => { const cw = Math.min(AREA_W, Math.max(w, 60)); return { cw, cl: Math.min(AREA_W - cw, Math.max(0, x + (w - cw) / 2)) }; };
 // เส้นไข่ปลาที่มีข้อความพิมพ์ทับ (สีน้ำเงิน) · ctx.edit = ช่องพิมพ์ได้ (data-ip = ตำแหน่งข้อมูล เช่น bed.0, it.2.1)
 const lines = (cls, txt = [], path, n, ctx) => Array.from({ length: n }, (_, i) => {
   const v = txt?.[i] || '';
@@ -369,12 +407,16 @@ function blockHtml(b, ctx) {
     case 'insp': return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:20mm;text-align:center;margin-top:6mm"><div><div class="ct-sg1"></div>${esc(b.roles[0])}</div><div><div class="ct-sg1"></div>${esc(b.roles[1])}</div></div>`;
     case 'att': {
       const code = p => p.code != null ? `<div class="fc">${esc(b.codeLbl || '')}${p.code ? `<span class="c-blue">${esc(p.code)}</span>` : `<span class="dots">${'.'.repeat(16)}</span>`}</div>` : '';
-      // หน้าต่างกรอก: ลากรูปสลับตำแหน่ง / ปุ่ม ◀ ▶ · พิมพ์คำอธิบายใต้ภาพ (เฉพาะรูปแนบ ไม่ใช่รูปบัตร)
-      const fig = (p, c) => ctx.edit && p.pi != null
-        ? `<figure draggable="true" data-pi="${p.pi}"><div class="ct-mv"><button type="button" data-mv="-1" data-pi="${p.pi}" title="เลื่อนไปก่อนหน้า">◀</button><span>ลากเพื่อย้าย</span><button type="button" data-mv="1" data-pi="${p.pi}" title="เลื่อนไปถัดไป">▶</button></div><div class="im ${c}"><img src="${p.url}" alt="" draggable="false"></div><input class="ct-in cap" data-cap="${p.pi}" value="${esc(p.label)}" placeholder="พิมพ์คำอธิบายใต้ภาพ"></figure>`
-        : `<figure><div class="im ${c}"><img src="${p.url}" alt=""></div>${p.label ? `<figcaption>${esc(p.label)}${code(p)}</figcaption>` : ''}</figure>`;
+      const fig = (p, c) => `<figure><div class="im ${c}"><img src="${p.url}" alt=""></div>${p.label ? `<figcaption>${esc(p.label)}${code(p)}</figcaption>` : ''}</figure>`;
+      // รูปแนบวางอิสระ (มม.) · หน้าต่างจัดรูป: ลากรูปย้ายที่ (ข้ามหน้าได้) · ลากมุมขวาล่างย่อ/ขยาย · พิมพ์คำอธิบายใต้ภาพ
+      const free = p => {
+        const { x, y, w } = p.lay, c = capBox(p.lay), cap = ctx.edit
+          ? `<input class="ct-in cap" data-cap="${p.pi}" value="${esc(p.label)}" placeholder="พิมพ์คำอธิบายใต้ภาพ" style="width:${c.cw}mm;margin-left:${c.cl - x}mm">`
+          : p.label ? `<div class="ct-fcap" style="width:${c.cw}mm;margin-left:${c.cl - x}mm">${esc(p.label)}</div>` : '';
+        return `<figure class="ct-fp" style="left:${x}mm;top:${y}mm;width:${w}mm"${ctx.edit ? ` data-pi="${p.pi}" data-pg="${b.pg}" data-x="${x}" data-y="${y}" data-w="${w}" data-ar="${p.ar}"` : ''}><div class="ct-fim"><img src="${p.url}" alt="" draggable="false">${ctx.edit ? '<span class="ct-rs" title="ลากเพื่อย่อ/ขยาย"></span>' : ''}</div>${cap}</figure>`;
+      };
       return `<div><p class="ct-atttl">${esc(b.title)}</p>${b.ids.length ? `<div class="ct-att${b.ids.length === 1 ? ' one' : ''}">${b.ids.map(p => fig(p, 'id')).join('')}</div>` : ''}
-        ${b.photos.length ? `<div class="ct-att">${b.photos.map(p => fig(p, b.tall ? 'tall' : '')).join('')}</div>` : ''}</div>`;
+        <div class="ct-free" style="height:${b.H}mm" data-pg="${b.pg}" data-h="${b.H}">${b.photos.map(free).join('')}</div></div>`;
     }
   }
   return '';
@@ -382,7 +424,7 @@ function blockHtml(b, ctx) {
 // แบ่งเป็นหน้า A4 ตามบล็อก "page"
 function pagesOf(blocks) {
   const pages = [{ fill: false, blocks: [] }];
-  for (const b of blocks) b.k === 'page' ? pages.push({ fill: !!b.fill, tag: b.tag || '', blocks: [] }) : pages[pages.length - 1].blocks.push(b);
+  for (const b of blocks) b.k === 'page' ? pages.push({ fill: !!b.fill, tag: b.tag || '', editOnly: !!b.editOnly, blocks: [] }) : pages[pages.length - 1].blocks.push(b);
   return pages.filter(p => p.blocks.length);
 }
 const headHtml = en => en ? '<div class="ct-hd">Meechai Apartment<br>65/105 Moo 2, Sam Wa Road, Bang Chan, Khlong Sam Wa, Bangkok 10510</div>'
@@ -391,7 +433,7 @@ const headHtml = en => en ? '<div class="ct-hd">Meechai Apartment<br>65/105 Moo 
 export async function pagesHtml(doc, { edit = false, only = null } = {}) {
   const [wm, qr] = await Promise.all([asset('brand'), asset('qr')]);
   const ctx = { qr, en: doc.en, edit };
-  return pagesOf(doc.blocks).filter(p => !only || only.includes(p.tag)).map(p => `<div class="ct-pg ${doc.en ? 'en' : ''}"${p.tag ? ` data-tag="${p.tag}"` : ''}>${wm ? `<img class="wm" src="${wm}" alt="">` : ''}${headHtml(doc.en)}<div class="ct-body${p.fill ? ' fill' : ''}">${p.blocks.map(b => blockHtml(b, ctx)).join('')}</div><div class="ct-ft"></div></div>`).join('');
+  return pagesOf(doc.blocks).filter(p => (!only || only.includes(p.tag)) && (edit || !p.editOnly)).map(p => `<div class="ct-pg ${doc.en ? 'en' : ''}"${p.tag ? ` data-tag="${p.tag}"` : ''}>${wm ? `<img class="wm" src="${wm}" alt="">` : ''}${headHtml(doc.en)}<div class="ct-body${p.fill ? ' fill' : ''}">${p.blocks.map(b => blockHtml(b, ctx)).join('')}</div><div class="ct-ft"></div></div>`).join('');
 }
 const SARABUN = 'https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap';
 export const docStyle = () => `<link href="${SARABUN}" rel="stylesheet"><style>${CSS}</style>`;
@@ -432,6 +474,23 @@ const FONT = 'Angsana New';
 const TW = 9639;   // ความกว้างพื้นที่พิมพ์ (twips) = A4 11906 − ขอบซ้าย 1134 − ขอบขวา 1133 (ตามไฟล์ต้นฉบับ)
 const imgSize = url => new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.onerror = () => r([4, 3]); i.src = url; });
 const fit = ([w, h], mw, mh) => { const k = Math.min(mw / w, mh / h); return [w * k, h * k]; };
+// รูป + คำอธิบายใต้ภาพ → JPEG เดียว (10 จุด/มม.) · คืนขนาดและตำแหน่งซ้าย (มม.)
+async function withCaption(p) {
+  const { x, w } = p.lay, h = w * p.ar;
+  const img = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = p.url; });
+  const c = p.label ? capBox(p.lay) : { cw: w, cl: x };
+  const L = Math.min(x, c.cl), R = Math.max(x + w, c.cl + c.cw), H = h + (p.label ? CAP : 0), k = 10;
+  const cv = document.createElement('canvas'); cv.width = Math.round((R - L) * k); cv.height = Math.round(H * k);
+  const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+  if (img) g.drawImage(img, (x - L) * k, 0, w * k, h * k);
+  if (p.label) {
+    await document.fonts?.load?.('37px Sarabun').catch(() => {});
+    let fs = 3.7 * k; g.fillStyle = '#000'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    do { g.font = `${fs}px Sarabun, Tahoma, sans-serif`; } while (g.measureText(p.label).width > c.cw * k && (fs -= 1) > 18);
+    g.fillText(p.label, (c.cl - L + c.cw / 2) * k, (h + 1 + 3.2) * k);
+  }
+  return { url: cv.toDataURL('image/jpeg', 0.88), w: R - L, h: H, x: L };
+}
 
 function docxWriter() {
   const media = [];   // { rid, name, bytes, ext }
@@ -446,7 +505,12 @@ function docxWriter() {
     const cx = Math.round(wmm * 36000), cy = Math.round(hmm * 36000), id = ++n;
     return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Picture ${id}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="img${id}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
   };
-  return { media, addImage, drawing };
+  // รูปลอย (วางตามพิกัด มม. จากขอบซ้ายของพื้นที่พิมพ์ และจากย่อหน้าที่ยึดไว้) — ย้ายต่อใน Word ได้
+  const anchor = (rid, wmm, hmm, xmm, ymm) => {
+    const cx = Math.round(wmm * 36000), cy = Math.round(hmm * 36000), id = ++n;
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id + 10}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="margin"><wp:posOffset>${Math.round(xmm * 36000)}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>${Math.round(ymm * 36000)}</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="Picture ${id}"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="img${id}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
+  };
+  return { media, addImage, drawing, anchor };
 }
 const rPr = r => {
   const c = r.c ? COLOR[r.c] : r.dots ? COLOR.gray : '';
@@ -510,7 +574,13 @@ async function blockDocx(b, ctx) {
       const cell = async (p, mw, mh) => { const [w, h] = fit(await imgSize(p.url), mw, mh); return cellX(half, P(ctx.wr.drawing(ctx.wr.addImage(p.url), w, h), { jc: 'center' }) + cap(p), { vAlign: 'bottom' }); };
       const grid = async (list, mw, mh) => { const rows = []; for (let i = 0; i < list.length; i += 2) rows.push((await cell(list[i], mw, mh)) + (list[i + 1] ? await cell(list[i + 1], mw, mh) : cellX(half, P('')))); return rows.length ? tableX([half, W - half], rows) : ''; };
       const ids = b.ids.length === 1 ? tableX([W], [cellX(W, P(ctx.wr.drawing(ctx.wr.addImage(b.ids[0].url), ...fit(await imgSize(b.ids[0].url), 82, 54)), { jc: 'center' }) + cap(b.ids[0]))]) : await grid(b.ids, 82, 54);
-      return P(runX({ t: b.title, b: 1, u: 1, sz: 38 }), { jc: 'center', after: 120 }) + ids + await grid(b.photos, 82, b.tall ? 105 : 72);
+      // รูปอิสระ: รวมรูป + คำอธิบายใต้ภาพเป็นภาพเดียว แล้ววางลอยตามตำแหน่งเดียวกับหน้าจอ
+      const pics = [];
+      for (const p of b.photos) {
+        const c = await withCaption(p);
+        pics.push(ctx.wr.anchor(ctx.wr.addImage(c.url), c.w, c.h, c.x, p.lay.y));
+      }
+      return P(runX({ t: b.title, b: 1, u: 1, sz: 38 }), { jc: 'center', after: 120 }) + ids + (pics.length ? P(pics.join('')) : '');
     }
   }
   return '';
@@ -521,9 +591,11 @@ export async function contractDocx(doc) {
   const wr = docxWriter();
   const ctx = { W: TW, en: doc.en, wr, qr, qrSize: qr ? await imgSize(qr) : [4, 3] };
   const parts = [];
+  let skip = false;
   for (const b of doc.blocks) {
     // หน้า 1–3 ของสัญญาให้ Word ตัดหน้าเองตามความยาวข้อความ (บังคับขึ้นหน้าใหม่เฉพาะใบตรวจสภาพห้องและรูปแนบ)
-    if (b.k === 'page') { if (parts.length && !b.flow) parts.push(pageBreak); continue; }
+    if (b.k === 'page') { skip = !!b.editOnly; if (!skip && parts.length && !b.flow) parts.push(pageBreak); continue; }
+    if (skip) continue;
     parts.push(await blockDocx(b, ctx));
   }
   const wmRid = wm ? 'rIdWm' : null, wmBytes = wm ? dataUrlBytes(wm) : null;
