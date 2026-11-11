@@ -8,6 +8,7 @@ import * as K from '../core/contract.js';
 import { compress, fileToDataUrl } from './tenants.js';
 import { editImage, dropZone } from '../core/imgedit.js';
 import { readMeter, canUseClaude } from '../core/meter.js';
+import { openInspect, inspSummary } from './inspect.js';
 
 const CSS = `
 .ctm{display:grid;grid-template-columns:minmax(360px,440px) 1fr;gap:14px;align-items:start}
@@ -42,6 +43,7 @@ const CSS = `
 .ctm .thumbs .t .rm{position:absolute;right:2px;top:2px;background:#fff;border-radius:50%;width:20px;height:20px;line-height:18px;font-size:12px;color:#c0392b;border:1px solid #ddd}
 .ctm .pv{max-height:72vh;overflow:auto;background:#e9edf2;border-radius:10px;padding:6px}
 .ctm .pv .zm{zoom:.62}
+.ctm .pv .ct-pg[data-tag]{cursor:pointer}.ctm .pv .ct-pg[data-tag]:hover{outline:3px solid #f0b400}
 .ctm .seg button{flex:1}
 @media (max-width:900px){.ctm{grid-template-columns:1fr}.ctm .pv{display:none}}
 `;
@@ -60,6 +62,7 @@ export async function openContract(tIn = {}, done) {
   const C = { ...K.defaults(t), birthDate: t.birthDate || '', address: t.address || '', ...(t.contract || {}) };
   C.extras = (C.extras || []).map(x => ({ ...x }));
   C.photos = (C.photos || []).map(x => ({ ...x }));
+  C.insp = K.inspOf(C);   // สำเนาใหม่ (แก้ในหน้าต่างนี้ไม่กระทบข้อมูลเดิมจนกว่าจะบันทึก)
   const maxOcc = Number(M.rates().maxOccupants ?? 2);
   let occs = (t.occupants || []).map(occOf).map(o => ({ ...o }));
   let newId = null;                 // รูปบัตรผู้เช่าใหม่ (ยังไม่บันทึก)
@@ -116,6 +119,10 @@ export async function openContract(tIn = {}, done) {
       <div class="sec"><h4>🖼️ 3. รูปแนบ <small>ไม่บังคับ · ลากรูปมาวางได้ · กดรูปเพื่อหมุน/ครอป · ใบตรวจสภาพห้องแนบให้อัตโนมัติ</small></h4>
         <div class="thumbs" id="c-ph3"></div>
         <input id="c-pf" type="file" accept="image/*" multiple hidden>
+      </div>
+      <div class="sec"><h4>📋 4. ใบตรวจสภาพห้อง · จัดรูปแนบ <small>พิมพ์บนเส้น · มาร์ค ✕ แดงบนผังห้อง · ติ๊กช่อง · ย้ายรูป + คำอธิบายใต้ภาพ</small></h4>
+        <button class="btn pri" type="button" id="c-insp">✏️ กรอกใบตรวจสภาพห้อง / จัดรูปแนบ</button>
+        <div class="auto" id="c-inspsum"></div>
       </div>
       <p class="note" style="margin:0 0 8px">ช่องจอดรถ (เลือกช่อง/ทะเบียน) ค่าเช่าล่วงหน้า และหมายเหตุ แก้เพิ่มได้ที่ปุ่ม "แก้ไขผู้เช่า" ในผังห้อง</p>
       <div class="err" id="c-err"></div>
@@ -335,6 +342,14 @@ export async function openContract(tIn = {}, done) {
   dropZone(q('#c-ph3'), fs => addPhotos(fs));
   q('#c-ph3').addEventListener('drop', e => { pickFor = e.target.closest('[data-pick]')?.dataset.pick; if (!pickFor || pickFor === 'x') pickFor = 'other'; }, true);
   drawPhotos();
+
+  // ---------- ใบตรวจสภาพห้อง + จัดรูปแนบ (กรอกบนหน้าเอกสาร) ----------
+  const inspSum = () => { const el = q('#c-inspsum'); if (el) el.textContent = inspSummary(C); };
+  const editInsp = () => openInspect({ C, docOf, onChange: structural => { dirty = true; inspSum(); preview(); if (structural) drawPhotos(); } });
+  q('#c-insp').onclick = editInsp;
+  // กดหน้าใบตรวจสภาพห้อง / รูปแนบในตัวอย่างด้านขวา → เปิดหน้าต่างกรอก
+  q('#c-pv').addEventListener('click', e => { if (e.target.closest('.ct-pg[data-tag]')) editInsp(); });
+  inspSum();
 
   // ---------- บันทึก ----------
   const save = async () => {

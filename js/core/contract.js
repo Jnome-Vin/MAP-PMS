@@ -177,18 +177,28 @@ function contentEN(C, x) {
   ];
 }
 
+// ข้อมูลที่กรอกในใบตรวจสภาพห้อง: ข้อความบนเส้น · จุด ✕ บนผังห้อง (พิกัดในผัง) · ติ๊กปกติ/ไม่ปกติ + 2 บรรทัดต่อรายการ
+export function inspOf(C) {
+  const s = C.insp || {}, arr = (a, n) => Array.from({ length: n }, (_, i) => String(a?.[i] ?? ''));
+  const mk = k => (s.marks?.[k] || []).map(m => [Number(m[0]) || 0, Number(m[1]) || 0]);
+  return { phase: s.phase === 'after' ? 'after' : 'before', bed: arr(s.bed, 8), bath: arr(s.bath, 3), bal: arr(s.bal, 3),
+    marks: { bed: mk('bed'), bath: mk('bath'), bal: mk('bal') },
+    items: Array.from({ length: 9 }, (_, i) => ({ s: ['ok', 'ng'].includes(s.items?.[i]?.s) ? s.items[i].s : '', l: arr(s.items?.[i]?.l, 2) })),
+    item10: String(s.item10 || '') };
+}
 function checklist(C, t, en) {
+  const I = inspOf(C), item = i => ({ k: 'item', i, label: i === 8 ? (I.item10 ? t.items[8].replace(/\.{3,}/, '') + I.item10 : t.items[8]) : t.items[i], custom: i === 8 ? I.item10 : null, ok: t.ok, ng: t.ng, s: I.items[i].s, l: I.items[i].l });
   return [
-    { k: 'page', fill: 1 },
+    { k: 'page', fill: 1, tag: 'insp' },
     { k: 'group', blocks: [{ k: 'p', center: 1, runs: [{ t: t.title + ' ', b: 1 }, { ...V(C.room, 'red', 6), b: 1 }] },
-      { k: 'check', before: t.before, after: t.after, date: [T(t.date + ' '), V(fDate(C.date, en), 'blue', 24)] }] },
-    { k: 'room1', label: t.bed, lines: 8 },
+      { k: 'check', phase: I.phase, before: t.before, after: t.after, date: [T(t.date + ' '), V(fDate(C.date, en), 'blue', 24)] }] },
+    { k: 'room1', label: t.bed, lines: 8, txt: I.bed, marks: I.marks.bed },
     { k: 'p', center: 1, runs: [C_(t.hint, 'red')] },
-    { k: 'room2', labels: [t.bath, t.bal], lines: 3 },
-    { k: 'item', label: t.items[0], ok: t.ok, ng: t.ng },
+    { k: 'room2', labels: [t.bath, t.bal], lines: 3, txt: [I.bath, I.bal], marks: [I.marks.bath, I.marks.bal] },
+    item(0),
     { k: 'insp', roles: [t.tenant, t.insp] },
-    { k: 'page', fill: 1 },
-    ...t.items.slice(1).map(label => ({ k: 'item', label, ok: t.ok, ng: t.ng })),
+    { k: 'page', fill: 1, tag: 'insp' },
+    ...t.items.slice(1).map((_, j) => item(j + 1)),
     { k: 'insp', roles: [t.tenant, t.insp] },
   ];
 }
@@ -197,8 +207,8 @@ function attachments(x, title) {
   const ids = x.ids || [], photos = x.photos || [];
   if (!ids.length && !photos.length) return [];
   const out = [], first = photos.slice(0, ids.length ? 4 : 4), rest = photos.slice(first.length);
-  out.push({ k: 'page' }, { k: 'att', title, ids, photos: first, tall: !ids.length, codeLbl: x.codeLbl });
-  for (let i = 0; i < rest.length; i += 4) out.push({ k: 'page' }, { k: 'att', title, ids: [], photos: rest.slice(i, i + 4), tall: true });
+  out.push({ k: 'page', tag: 'att' }, { k: 'att', title, ids, photos: first, tall: !ids.length, codeLbl: x.codeLbl });
+  for (let i = 0; i < rest.length; i += 4) out.push({ k: 'page', tag: 'att' }, { k: 'att', title, ids: [], photos: rest.slice(i, i + 4), tall: true });
   return out;
 }
 
@@ -209,11 +219,16 @@ export const ROOMS = {
   bal: [214, 160, 51, [[56, 0, 87, 160], [0, 53, 214, 44], [64, 16, 71, 37]]],
 };
 // วาดเป็นรูป (ใช้ทั้งหน้า A4 และไฟล์ Word) — เส้นคมและตรงกันทุกแบบ
-const roomSvg = def => `<img src="${roomPng(def)}" alt="" style="width:${def[2]}mm;display:block;margin:0 auto">`;
-const roomPng = ([vw, vh, , rects], k = 4) => {
+// key + edit = กดบนผังเพื่อมาร์ค ✕ (หน้าต่างกรอกใบตรวจสภาพห้อง)
+const roomSvg = (def, marks = [], key = '', edit = false) => `<img src="${roomPng(def, marks)}" alt=""${edit ? ` data-room="${key}"` : ''} style="width:${def[2]}mm;display:block;margin:0 auto">`;
+// marks = จุดที่ไม่ปกติ [x, y] ในหน่วยของผัง (รวมขอบ 2) → กากบาทสีแดงขนาดประมาณตัวอักษร
+export const roomPng = ([vw, vh, , rects], marks = [], k = 4) => {
   const c = document.createElement('canvas'); c.width = (vw + 4) * k; c.height = (vh + 4) * k;
   const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.strokeStyle = '#000'; g.lineWidth = 1.4 * k / 2;
   rects.forEach(([x, y, w, h]) => g.strokeRect((x + 2) * k, (y + 2) * k, w * k, h * k));
+  g.strokeStyle = '#EE0000'; g.lineWidth = 1.8 * k; g.lineCap = 'round';
+  const s = 6;
+  for (const [x, y] of marks) { g.beginPath(); g.moveTo((x - s) * k, (y - s) * k); g.lineTo((x + s) * k, (y + s) * k); g.moveTo((x + s) * k, (y - s) * k); g.lineTo((x - s) * k, (y + s) * k); g.stroke(); }
   return c.toDataURL('image/png');
 };
 
@@ -239,7 +254,8 @@ export async function build(C, t, { forLine = false, getPhoto = null } = {}) {
     x.codeLbl = en ? 'Face scanner access code: ' : 'รหัสเครื่องสแกนใบหน้า: ';
   }
   const EN_LBL = { meterE: 'Electricity meter', meterW: 'Water meter', fridge: 'Refrigerator' };
-  for (const p of C.photos || []) { const u = await photoData(p.id); if (u) x.photos.push({ url: u, label: (en && EN_LBL[p.tag]) || p.label || '' }); }
+  // pi = ลำดับใน C.photos (ใช้สลับตำแหน่ง / แก้คำอธิบายใต้ภาพ) · custom = ผู้ใช้พิมพ์คำอธิบายเอง
+  for (const [pi, p] of (C.photos || []).entries()) { const u = await photoData(p.id); if (u) x.photos.push({ url: u, pi, label: p.custom ? p.label || '' : (en && EN_LBL[p.tag]) || p.label || '' }); }
   return { blocks: en ? contentEN(C, x) : contentTH(C, x), en };
 }
 
@@ -287,10 +303,14 @@ const CSS = `
 .ct-att{display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin-bottom:6mm}
 .ct-att.one{grid-template-columns:1fr;width:calc(50% - 3mm);margin-left:auto;margin-right:auto}
 .ct-att figure{margin:0;display:flex;flex-direction:column;align-items:center}
-.ct-att .im{width:100%;height:76mm;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.ct-att .im{width:100%;height:76mm;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
 .ct-att .im.id{height:auto;aspect-ratio:85.6/54}.ct-att .im.tall{height:110mm}
 .ct-att img{max-width:100%;max-height:100%;object-fit:contain}
-.ct-att figcaption{font-size:12px;color:#555;margin-top:1mm}
+.ct-att figcaption{font-size:14px;color:#000;margin-top:1mm;line-height:1.35}
+.ct-ln,.ct-cl .ln{display:flex;align-items:flex-end}
+.ct-tx,.ct-in{font:inherit;font-size:14px;line-height:1.2;color:#0070C0;padding:0 3px 1px;white-space:nowrap;overflow:hidden;width:100%;text-align:left}
+.ct-in{border:0;background:#fff7cc;outline:none;border-radius:3px 3px 0 0}.ct-in:focus{background:#ffe98a}
+.ct-in.cap{color:#000;text-align:center;border-bottom:1px dotted #999;margin-top:1mm;width:90%}
 @media screen{.ct-pg{margin:12px auto;box-shadow:0 2px 12px rgba(0,0,0,.14)}}
 `;
 const cls = r => [r.c ? 'c-' + r.c : '', r.dots ? 'dots' : ''].filter(Boolean).join(' ');
@@ -315,6 +335,12 @@ const runHtml = (r, j) => {
   const c = cls(r); return c ? `<span class="${c}">${h}</span>` : h;
 };
 const runsHtml = (rs, j) => rs.map(r => runHtml(r, j)).join('');
+// เส้นไข่ปลาที่มีข้อความพิมพ์ทับ (สีน้ำเงิน) · ctx.edit = ช่องพิมพ์ได้ (data-ip = ตำแหน่งข้อมูล เช่น bed.0, it.2.1)
+const lines = (cls, txt = [], path, n, ctx) => Array.from({ length: n }, (_, i) => {
+  const v = txt?.[i] || '';
+  return ctx.edit ? `<div class="${cls}"><input class="ct-in" data-ip="${path}.${i}" value="${esc(v)}" maxlength="140"></div>`
+    : `<div class="${cls}">${v ? `<span class="ct-tx">${esc(v)}</span>` : ''}</div>`;
+}).join('');
 function blockHtml(b, ctx) {
   switch (b.k) {
     case 'title': return `<div class="ct-title"><u>${esc(b.title)}</u><div class="ct-room">${esc(b.room || '')}</div></div>`;
@@ -331,15 +357,22 @@ function blockHtml(b, ctx) {
     }
     case 'meters': return `<div class="ct-row2" style="padding:0 ${ctx.en ? 6 : 12}mm"><span>${runsHtml(b.l)}</span><span>${runsHtml(b.r)}</span></div>`;
     case 'remarks': return `<div class="ct-rmk"><span>${esc(b.label)}</span><i></i></div>` + '<div class="ct-rmk"><i></i></div>'.repeat(b.n - 1);
-    case 'check': return `<div class="ct-check"><span><span class="ct-box t"></span>${esc(b.before)}</span><span><span class="ct-box"></span>${esc(b.after)}</span><span>${runsHtml(b.date)}</span></div>`;
-    case 'room1': return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm;align-items:center"><div class="ctr">${roomSvg(ROOMS.bed)}<div style="margin-top:3mm"><b>${esc(b.label)}</b></div></div><div>${'<div class="ct-ln"></div>'.repeat(b.lines)}</div></div>`;
-    case 'room2': return `<div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm;text-align:center"><div>${roomSvg(ROOMS.bath)}<div style="margin-top:3mm"><b>${esc(b.labels[0])}</b></div></div><div>${roomSvg(ROOMS.bal)}<div style="margin-top:3mm"><b>${esc(b.labels[1])}</b></div></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm"><div>${'<div class="ct-ln"></div>'.repeat(b.lines)}</div><div>${'<div class="ct-ln"></div>'.repeat(b.lines)}</div></div></div>`;
-    case 'item': return `<div class="ct-cl"><span>${esc(b.label)}</span><span><span class="ct-box"></span>${esc(b.ok)}</span><span><span class="ct-box"></span>${esc(b.ng)}</span><div><div class="ln"></div><div class="ln"></div></div></div>`;
+    case 'check': { const ck = (v, l) => `<span class="ck"${ctx.edit ? ` data-ck="ph" data-v="${v}"` : ''}><span class="ct-box${b.phase === v ? ' t' : ''}"></span>${esc(l)}</span>`;
+      return `<div class="ct-check">${ck('before', b.before)}${ck('after', b.after)}<span>${runsHtml(b.date)}</span></div>`; }
+    case 'room1': return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm;align-items:center"><div class="ctr">${roomSvg(ROOMS.bed, b.marks, 'bed', ctx.edit)}<div style="margin-top:3mm"><b>${esc(b.label)}</b></div></div><div>${lines('ct-ln', b.txt, 'bed', b.lines, ctx)}</div></div>`;
+    case 'room2': return `<div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm;text-align:center"><div>${roomSvg(ROOMS.bath, b.marks?.[0], 'bath', ctx.edit)}<div style="margin-top:3mm"><b>${esc(b.labels[0])}</b></div></div><div>${roomSvg(ROOMS.bal, b.marks?.[1], 'bal', ctx.edit)}<div style="margin-top:3mm"><b>${esc(b.labels[1])}</b></div></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8mm"><div>${lines('ct-ln', b.txt?.[0], 'bath', b.lines, ctx)}</div><div>${lines('ct-ln', b.txt?.[1], 'bal', b.lines, ctx)}</div></div></div>`;
+    case 'item': {
+      const ck = (v, l) => `<span class="ck"${ctx.edit ? ` data-ck="it" data-i="${b.i}" data-v="${v}"` : ''}><span class="ct-box${b.s === v ? ' t' : ''}"></span>${esc(l)}</span>`;
+      const label = ctx.edit && b.custom != null ? `<span style="display:flex;align-items:flex-end">10.&nbsp;<input class="ct-in" data-ip="item10" value="${esc(b.custom)}" placeholder="พิมพ์รายการเพิ่ม" style="width:38mm"></span>` : esc(b.label);
+      return `<div class="ct-cl"><span>${label}</span>${ck('ok', b.ok)}${ck('ng', b.ng)}<div>${lines('ln', b.l, `it.${b.i}`, 2, ctx)}</div></div>`; }
     case 'insp': return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:20mm;text-align:center;margin-top:6mm"><div><div class="ct-sg1"></div>${esc(b.roles[0])}</div><div><div class="ct-sg1"></div>${esc(b.roles[1])}</div></div>`;
     case 'att': {
       const code = p => p.code != null ? `<div class="fc">${esc(b.codeLbl || '')}${p.code ? `<span class="c-blue">${esc(p.code)}</span>` : `<span class="dots">${'.'.repeat(16)}</span>`}</div>` : '';
-      const fig = (p, c) => `<figure><div class="im ${c}"><img src="${p.url}" alt=""></div>${p.label ? `<figcaption>${esc(p.label)}${code(p)}</figcaption>` : ''}</figure>`;
+      // หน้าต่างกรอก: ลากรูปสลับตำแหน่ง / ปุ่ม ◀ ▶ · พิมพ์คำอธิบายใต้ภาพ (เฉพาะรูปแนบ ไม่ใช่รูปบัตร)
+      const fig = (p, c) => ctx.edit && p.pi != null
+        ? `<figure draggable="true" data-pi="${p.pi}"><div class="ct-mv"><button type="button" data-mv="-1" data-pi="${p.pi}" title="เลื่อนไปก่อนหน้า">◀</button><span>ลากเพื่อย้าย</span><button type="button" data-mv="1" data-pi="${p.pi}" title="เลื่อนไปถัดไป">▶</button></div><div class="im ${c}"><img src="${p.url}" alt="" draggable="false"></div><input class="ct-in cap" data-cap="${p.pi}" value="${esc(p.label)}" placeholder="พิมพ์คำอธิบายใต้ภาพ"></figure>`
+        : `<figure><div class="im ${c}"><img src="${p.url}" alt=""></div>${p.label ? `<figcaption>${esc(p.label)}${code(p)}</figcaption>` : ''}</figure>`;
       return `<div><p class="ct-atttl">${esc(b.title)}</p>${b.ids.length ? `<div class="ct-att${b.ids.length === 1 ? ' one' : ''}">${b.ids.map(p => fig(p, 'id')).join('')}</div>` : ''}
         ${b.photos.length ? `<div class="ct-att">${b.photos.map(p => fig(p, b.tall ? 'tall' : '')).join('')}</div>` : ''}</div>`;
     }
@@ -349,15 +382,16 @@ function blockHtml(b, ctx) {
 // แบ่งเป็นหน้า A4 ตามบล็อก "page"
 function pagesOf(blocks) {
   const pages = [{ fill: false, blocks: [] }];
-  for (const b of blocks) b.k === 'page' ? pages.push({ fill: !!b.fill, blocks: [] }) : pages[pages.length - 1].blocks.push(b);
+  for (const b of blocks) b.k === 'page' ? pages.push({ fill: !!b.fill, tag: b.tag || '', blocks: [] }) : pages[pages.length - 1].blocks.push(b);
   return pages.filter(p => p.blocks.length);
 }
 const headHtml = en => en ? '<div class="ct-hd">Meechai Apartment<br>65/105 Moo 2, Sam Wa Road, Bang Chan, Khlong Sam Wa, Bangkok 10510</div>'
   : '<div class="ct-hd">มีชัย อพาร์ทเม้นท์<br>65/105 หมู่ 2 ถนนสามวา แขวงบางชัน เขตคลองสามวา กรุงเทพมหานคร 10510</div>';
-export async function pagesHtml(doc) {
+// edit = หน้าต่างกรอกใบตรวจสภาพห้อง (ช่องพิมพ์/ติ๊ก/มาร์ค) · only = แสดงเฉพาะหน้าที่มี tag ตามรายการ
+export async function pagesHtml(doc, { edit = false, only = null } = {}) {
   const [wm, qr] = await Promise.all([asset('brand'), asset('qr')]);
-  const ctx = { qr, en: doc.en };
-  return pagesOf(doc.blocks).map(p => `<div class="ct-pg ${doc.en ? 'en' : ''}">${wm ? `<img class="wm" src="${wm}" alt="">` : ''}${headHtml(doc.en)}<div class="ct-body${p.fill ? ' fill' : ''}">${p.blocks.map(b => blockHtml(b, ctx)).join('')}</div><div class="ct-ft"></div></div>`).join('');
+  const ctx = { qr, en: doc.en, edit };
+  return pagesOf(doc.blocks).filter(p => !only || only.includes(p.tag)).map(p => `<div class="ct-pg ${doc.en ? 'en' : ''}"${p.tag ? ` data-tag="${p.tag}"` : ''}>${wm ? `<img class="wm" src="${wm}" alt="">` : ''}${headHtml(doc.en)}<div class="ct-body${p.fill ? ' fill' : ''}">${p.blocks.map(b => blockHtml(b, ctx)).join('')}</div><div class="ct-ft"></div></div>`).join('');
 }
 const SARABUN = 'https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap';
 export const docStyle = () => `<link href="${SARABUN}" rel="stylesheet"><style>${CSS}</style>`;
@@ -428,6 +462,8 @@ const TABS = (...t) => t.map(([pos, val = 'left', leader]) => `<w:tab w:val="${v
 const cellX = (w, inner, { border, vAlign } = {}) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${border ? '<w:tcBorders><w:top w:val="single" w:sz="12"/><w:left w:val="single" w:sz="12"/><w:bottom w:val="single" w:sz="12"/><w:right w:val="single" w:sz="12"/></w:tcBorders>' : ''}${vAlign ? `<w:vAlign w:val="${vAlign}"/>` : ''}</w:tcPr>${inner}</w:tc>`;
 const tableX = (widths, rows) => `<w:tbl><w:tblPr><w:tblW w:w="${widths.reduce((a, b) => a + b, 0)}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders><w:tblCellMar><w:left w:w="40" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${widths.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${rows.map(r => `<w:tr>${r}</w:tr>`).join('')}</w:tbl>`;
 const pageBreak = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+// บรรทัดไข่ปลา (ข้อความที่พิมพ์ไว้สีน้ำเงินนำหน้า แล้วจุดต่อจนสุดบรรทัด)
+const dotLines = (txt = [], n, pos) => Array.from({ length: n }, (_, i) => P((txt?.[i] ? runX({ t: txt[i], c: 'blue' }) : '') + tab(), { tabs: TABS([pos, 'right', 'dot']), before: 120 })).join('');
 
 async function blockDocx(b, ctx) {
   const W = ctx.W, en = ctx.en, jc = en ? 'both' : 'thaiDistribute';
@@ -450,27 +486,28 @@ async function blockDocx(b, ctx) {
     }
     case 'meters': return P(flat(b.l).map(runX).join('') + tab() + flat(b.r).map(runX).join(''), { ind: 680, tabs: TABS([TW - 680, 'right']), before: 240, after: 240 });
     case 'remarks': return P(runX({ t: b.label + ' ' }) + tab(), { tabs: TABS([TW, 'right', 'dot']) }) + Array(b.n - 1).fill(P(tab(), { tabs: TABS([TW, 'right', 'dot']) })).join('');
-    case 'check': return P(runX({ t: '☑ ', c: 'red' }) + runX({ t: b.before }) + tab() + runX({ t: '☐ ' + b.after }) + tab() + flat(b.date).map(runX).join(''), { tabs: TABS([2200], [4300]), after: 200 });
+    case 'check': { const bx = v => (b.phase === v ? runX({ t: '☑ ', c: 'red' }) : runX({ t: '☐ ' }));
+      return P(bx('before') + runX({ t: b.before }) + tab() + bx('after') + runX({ t: b.after }) + tab() + flat(b.date).map(runX).join(''), { tabs: TABS([2200], [4300]), after: 200 }); }
     case 'room1': {
-      const [vw, vh, mm] = ROOMS.bed, img = ctx.wr.drawing(ctx.wr.addImage(roomPng(ROOMS.bed)), mm, mm * vh / vw);
-      const lines = Array(b.lines).fill(P(tab(), { tabs: TABS([W / 2 - 200, 'right', 'dot']), before: 120 })).join('');
-      return tableX([W / 2, W / 2], [cellX(W / 2, P(img, { jc: 'center', before: 120 }) + P(runX({ t: b.label, b: 1 }), { jc: 'center', before: 120, after: 120 }), { vAlign: 'center' }) + cellX(W / 2, lines, { vAlign: 'center' })]);
+      const [vw, vh, mm] = ROOMS.bed, img = ctx.wr.drawing(ctx.wr.addImage(roomPng(ROOMS.bed, b.marks)), mm, mm * vh / vw);
+      return tableX([W / 2, W / 2], [cellX(W / 2, P(img, { jc: 'center', before: 120 }) + P(runX({ t: b.label, b: 1 }), { jc: 'center', before: 120, after: 120 }), { vAlign: 'center' }) + cellX(W / 2, dotLines(b.txt, b.lines, W / 2 - 200), { vAlign: 'center' })]);
     }
     case 'room2': {
-      const im = k => { const [vw, vh, mm] = ROOMS[k]; return ctx.wr.drawing(ctx.wr.addImage(roomPng(ROOMS[k])), mm, mm * vh / vw); };
-      const lines = Array(b.lines).fill(P(tab(), { tabs: TABS([W / 2 - 200, 'right', 'dot']), before: 120 })).join('');
-      return tableX([W / 2, W / 2], [cellX(W / 2, P(im('bath'), { jc: 'center', before: 120 }) + P(runX({ t: b.labels[0], b: 1 }), { jc: 'center', before: 120 })) + cellX(W / 2, P(im('bal'), { jc: 'center', before: 120 }) + P(runX({ t: b.labels[1], b: 1 }), { jc: 'center', before: 120 })),
-        cellX(W / 2, lines) + cellX(W / 2, lines)]);
+      const im = (k, ms) => { const [vw, vh, mm] = ROOMS[k]; return ctx.wr.drawing(ctx.wr.addImage(roomPng(ROOMS[k], ms)), mm, mm * vh / vw); };
+      return tableX([W / 2, W / 2], [cellX(W / 2, P(im('bath', b.marks?.[0]), { jc: 'center', before: 120 }) + P(runX({ t: b.labels[0], b: 1 }), { jc: 'center', before: 120 })) + cellX(W / 2, P(im('bal', b.marks?.[1]), { jc: 'center', before: 120 }) + P(runX({ t: b.labels[1], b: 1 }), { jc: 'center', before: 120 })),
+        cellX(W / 2, dotLines(b.txt?.[0], b.lines, W / 2 - 200)) + cellX(W / 2, dotLines(b.txt?.[1], b.lines, W / 2 - 200))]);
     }
-    case 'item': return P(runX({ t: b.label }) + tab() + runX({ t: '☐ ' + b.ok }) + tab() + runX({ t: '☐ ' + b.ng }) + tab(), { tabs: TABS([2900], [4200], [TW, 'right', 'dot']), before: 160 }) +
-      P(tab(), { tabs: TABS([5600], [TW, 'right', 'dot']), after: 120 });
+    case 'item': { const bx = (v, l) => (b.s === v ? runX({ t: '☑ ', c: 'red' }) + runX({ t: l }) : runX({ t: '☐ ' + l })), l = b.l || [];
+      return P(runX({ t: b.label }) + tab() + bx('ok', b.ok) + tab() + bx('ng', b.ng) + tab() + (l[0] ? runX({ t: l[0], c: 'blue' }) : '') + tab(), { tabs: TABS([2900], [4200], [5500], [TW, 'right', 'dot']), before: 160 }) +
+        P(tab() + (l[1] ? runX({ t: l[1], c: 'blue' }) : '') + tab(), { tabs: TABS([5500], [TW, 'right', 'dot']), after: 120 }); }
     case 'insp': return P(tab({}) + tab() + tab() + tab(), { tabs: TABS([600], [4000, 'left', 'dot'], [5600], [9000, 'left', 'dot']), before: 600 }) +
       P(tab() + runX({ t: b.roles[0] }) + tab() + runX({ t: b.roles[1] }), { tabs: TABS([2300, 'center'], [7300, 'center']) });
     case 'att': {
       const half = Math.floor(W / 2);
-      const cap = p => !p.label ? P('', { after: 120 }) : p.code == null ? P(runX({ t: p.label, sz: 24 }), { jc: 'center', after: 120 })
-        : P(runX({ t: p.label, sz: 24 }), { jc: 'center' }) + P(runX({ t: b.codeLbl || '', sz: 24 }) + (p.code ? runX({ t: p.code, c: 'blue', sz: 24 }) : runX({ t: '.'.repeat(16), dots: 1, sz: 24 })), { jc: 'center', after: 120 });
-      const cell = async (p, mw, mh) => { const [w, h] = fit(await imgSize(p.url), mw, mh); return cellX(half, P(ctx.wr.drawing(ctx.wr.addImage(p.url), w, h), { jc: 'center' }) + cap(p)); };
+      // คำอธิบายใต้ภาพ ขนาดเท่าข้อความในใบตรวจสภาพห้อง (16pt)
+      const cap = p => !p.label ? P('', { after: 120 }) : p.code == null ? P(runX({ t: p.label }), { jc: 'center', after: 120 })
+        : P(runX({ t: p.label }), { jc: 'center' }) + P(runX({ t: b.codeLbl || '', sz: 28 }) + (p.code ? runX({ t: p.code, c: 'blue', sz: 28 }) : runX({ t: '.'.repeat(16), dots: 1, sz: 28 })), { jc: 'center', after: 120 });
+      const cell = async (p, mw, mh) => { const [w, h] = fit(await imgSize(p.url), mw, mh); return cellX(half, P(ctx.wr.drawing(ctx.wr.addImage(p.url), w, h), { jc: 'center' }) + cap(p), { vAlign: 'bottom' }); };
       const grid = async (list, mw, mh) => { const rows = []; for (let i = 0; i < list.length; i += 2) rows.push((await cell(list[i], mw, mh)) + (list[i + 1] ? await cell(list[i + 1], mw, mh) : cellX(half, P('')))); return rows.length ? tableX([half, W - half], rows) : ''; };
       const ids = b.ids.length === 1 ? tableX([W], [cellX(W, P(ctx.wr.drawing(ctx.wr.addImage(b.ids[0].url), ...fit(await imgSize(b.ids[0].url), 82, 54)), { jc: 'center' }) + cap(b.ids[0]))]) : await grid(b.ids, 82, 54);
       return P(runX({ t: b.title, b: 1, u: 1, sz: 38 }), { jc: 'center', after: 120 }) + ids + await grid(b.photos, 82, b.tall ? 105 : 72);
