@@ -32,6 +32,12 @@ export async function init() {
     timer = setTimeout(async () => { if (await autoUpload()) run(); }, 4000);
   });
   setInterval(() => { if (state.online && isServerMode()) run({ pullOnly: false }); }, 5 * 60e3);
+  // กลับมาที่แอป (สลับจากแชท LINE / แท็บอื่น) → ดึงข้อมูลล่าสุด ถ้าซิงก์ครั้งล่าสุดนานกว่า 30 วินาที
+  let lastFocusRun = 0;
+  addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !state.online || !isServerMode() || Date.now() - lastFocusRun < 30e3) return;
+    lastFocusRun = Date.now(); run();
+  });
   if (state.online && isServerMode()) run();
 }
 

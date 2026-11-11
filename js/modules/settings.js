@@ -4,7 +4,7 @@ import * as M from '../core/model.js';
 import * as auth from '../core/auth.js';
 import * as api from '../core/api.js';
 import * as sync from '../core/sync.js';
-import { getApiUrl, setApiUrl, APP } from '../core/config.js';
+import { getApiUrl, setApiUrl, APP, isServerMode } from '../core/config.js';
 import { esc, toast, openModal, closeModal, confirmBox, thDate } from '../core/ui.js';
 import { randomString } from '../core/auth.js';
 import { printInFrame } from '../core/printframe.js';
@@ -166,7 +166,8 @@ export default {
       await db.put('lineLinks', { ...l, active: false, unlinkedAt: new Date().toISOString() });
       toast(`ยกเลิกการผูก LINE ห้อง ${l.room} แล้ว`); re();
     });
-    $e('#codes').onclick = async () => {
+    // fresh = ดึงสถานะล่าสุดจาก Google ก่อน (ผู้เช่าเพิ่งผูก LINE จะขึ้น ✅ ทันที ไม่ต้องรอซิงก์รอบ 5 นาที)
+    const openCodes = async (fresh = true) => {
       // สร้างรหัสผูก LINE ให้ห้องที่ยังไม่มี: ห้องพัก/Kiosk ทุกห้อง + ห้องประเภทอื่นที่มีผู้เช่า (เช่น 102 ห้องซักผ้า)
       for (const r of M.rooms().filter(r => r.kind === 'room' || r.kind === 'kiosk' || M.tenantOf(r.id))) if (!r.lineCode) await db.put('rooms', { ...r, lineCode: randomString(6, '0123456789') });
       // ข้อความชวนผู้เช่าผูก LINE (รหัสอยู่บรรทัดของตัวเอง — webhook รับได้แม้ผู้เช่าคัดลอกข้อความทั้งหมดส่งกลับมา)
@@ -181,7 +182,18 @@ export default {
         <div class="scroll" style="max-height:50vh"><table class="tbl"><thead><tr><th>ห้อง</th><th>ผู้เช่า</th><th>ข้อความที่ต้องส่ง</th><th>สถานะ</th><th></th></tr></thead><tbody>
         ${M.rooms().filter(r => r.lineCode).map(r => { const l = M.lineLinkOf(r.id); return `<tr><td>${r.id}</td><td>${esc(M.tenantOf(r.id)?.name || '-')}${M.tenantOf(r.id)?.lang === 'en' ? ' <span class="pill idle" title="ผู้เช่าต่างชาติ — ข้อความเป็นภาษาอังกฤษ">EN</span>' : ''}</td><td><code style="color:#e00000;font-weight:700">${r.id}-${r.lineCode}</code></td><td>${l ? '✅ ' + esc(l.displayName || '') : '-'}</td>
           <td style="white-space:nowrap"><button class="btn sm" data-copy="${r.id}" title="คัดลอกข้อความพร้อมรหัส">📋 คัดลอก</button>${l && auth.current()?.role === 'admin' ? ` <button class="btn sm" data-unlink="${r.id}" style="color:var(--bad)" title="ยกเลิกการผูก LINE ของห้องนี้ (ต้องใส่รหัสผ่าน)">🔓 ยกเลิกการผูก</button>` : ''}</td></tr>`; }).join('')}
-        </tbody></table></div><div class="form-acts"><button class="btn" id="cx">ปิด</button><button class="btn pri" id="cp">พิมพ์ใบแจ้งรหัส</button></div>`, { wide: true });
+        </tbody></table></div><div class="form-acts"><span class="note" id="csync" style="margin-right:auto"></span>${isServerMode() ? '<button class="btn" id="cre" title="ดึงสถานะการผูก LINE ล่าสุดจาก Google">🔄 ตรวจสถานะ</button>' : ''}<button class="btn" id="cx">ปิด</button><button class="btn pri" id="cp">พิมพ์ใบแจ้งรหัส</button></div>`, { wide: true });
+      box.querySelector('#cre')?.addEventListener('click', () => openCodes(true));
+      if (fresh && isServerMode() && navigator.onLine) {
+        box.querySelector('#csync').textContent = '🔄 กำลังดึงสถานะล่าสุด…';
+        await sync.run();
+        for (let i = 0; i < 60 && sync.status().syncing; i++) await new Promise(r => setTimeout(r, 500));   // มีซิงก์ค้างอยู่ก่อน: รอให้เสร็จ
+        if (box.isConnected && box.querySelector('#csync')) {
+          const st = sync.status();
+          if (st.error) box.querySelector('#csync').textContent = '⚠️ ดึงสถานะไม่สำเร็จ: ' + st.error;
+          else return openCodes(false);   // แสดงตารางใหม่ด้วยข้อมูลล่าสุด
+        }
+      }
       // ยกเลิกการผูก LINE: ยืนยันด้วยรหัสผ่านของผู้ใช้ที่เข้าสู่ระบบ · เลือกเปลี่ยนรหัสห้องใหม่ได้ (LINE เดิมผูกกลับด้วยรหัสเก่าไม่ได้)
       box.querySelectorAll('[data-unlink]').forEach(b => b.onclick = async () => {
         const room = b.dataset.unlink, links = db.all('lineLinks').filter(l => l.room === room && l.active !== false);
@@ -193,7 +205,7 @@ export default {
         for (const l of links) await db.put('lineLinks', { ...l, active: false, unlinkedAt: at, unlinkedBy: by });
         if (ok.newCode) { const r = db.get('rooms', room); await db.put('rooms', { ...r, lineCode: randomString(6, '0123456789') }); }
         toast(`ยกเลิกการผูก LINE ห้อง ${room} แล้ว${ok.newCode ? ' · เปลี่ยนรหัสใหม่แล้ว' : ''}`, 3500);
-        $e('#codes').onclick();   // แสดงตารางใหม่
+        openCodes(false);   // แสดงตารางใหม่
       });
       box.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
         const r = db.get('rooms', b.dataset.copy);
@@ -213,6 +225,7 @@ export default {
           <p>รับบิลค่าเช่าทาง LINE: เพิ่มเพื่อน LINE OA ของอาคาร แล้วพิมพ์ข้อความนี้</p><p style="font-size:28px;font-family:monospace;color:#e00000"><b>${r.id}-${r.lineCode}</b></p></div>`).join(''));
       };
     };
+    $e('#codes').onclick = () => openCodes(true);
     el.querySelectorAll('[data-room]').forEach(b => b.onclick = () => roomForm(db.get('rooms', b.dataset.room), re));
     $e('#addRoom')?.addEventListener('click', () => roomForm(null, re));
     $e('#impf')?.addEventListener('change', async e => {
