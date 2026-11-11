@@ -43,7 +43,8 @@ export async function init() {
 
 export const tokenReady = () => { state.needAuth = false; emit(); };
 
-export async function run() {
+// full = ดึงข้อมูลทั้งหมดจาก server มาเทียบใหม่ (ปุ่ม "ตรวจสถานะ") — รวมกับของในเครื่องแบบปกติ (ของในเครื่องที่ใหม่กว่า/ยังไม่อัปโหลดชนะ)
+export async function run({ full = false } = {}) {
   if (!isServerMode() || state.syncing) return;
   if (!navigator.onLine) { state.online = false; emit(); return; }
   state.syncing = true; state.error = ''; emit();
@@ -59,19 +60,22 @@ export async function run() {
     }
     const entries = (await db.outbox()).sort((a, b) => a.seq - b.seq);
 
-    // 1) รูปบัตรประชาชน → Google Drive
+    // 1) รูปบัตรประชาชน → Google Drive (รูปที่อัปโหลดไม่ผ่าน เก็บไว้ลองรอบหน้า — ไม่ให้ขวางการซิงก์ข้อมูล)
+    let photoErr = '';
     for (const e of entries.filter(e => e.kind === 'photo')) {
-      const p = await db.getPhoto(e.photoId);
-      if (p && !p.driveId) {
-        const r = await api.call('uploadPhoto', { id: p.id, dataUrl: p.dataUrl, name: p.name, folder: e.folder || 'idcard' });
-        await db.putPhoto({ ...p, driveId: r.fileId });
-      }
-      await db.unqueue(e.seq);
+      try {
+        const p = await db.getPhoto(e.photoId);
+        if (p && !p.driveId) {
+          const r = await api.call('uploadPhoto', { id: p.id, dataUrl: p.dataUrl, name: p.name, folder: e.folder || 'idcard' });
+          await db.putPhoto({ ...p, driveId: r.fileId });
+        }
+        await db.unqueue(e.seq);
+      } catch (x) { if (x.code === 'AUTH') throw x; photoErr = 'อัปโหลดรูปไม่สำเร็จ: ' + x.message; }
     }
 
     // 2) ข้อมูล → Google Sheets (ส่งของเรา + รับของเครื่องอื่นกลับมา)
     const puts = entries.filter(e => e.kind === 'put');
-    const since = await db.meta('lastSync') || '';
+    const since = full ? '' : await db.meta('lastSync') || '';
     const changes = puts.map(e => ({ col: e.col, rec: db.all(e.col, { withDeleted: true }).find(o => o.id === e.id) })).filter(c => c.rec);
     for (let i = 0; i < Math.max(changes.length, 1); i += 200) {
       const chunk = changes.slice(i, i + 200);
@@ -99,6 +103,7 @@ export async function run() {
 
     state.lastSync = await db.meta('lastSync');
     state.needAuth = false;
+    if (photoErr && !state.error) state.error = photoErr;
     if (state.error) throw new Error(state.error);
   } catch (e) {
     if (e.code === 'AUTH') state.needAuth = true;

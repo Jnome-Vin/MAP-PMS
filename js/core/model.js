@@ -17,7 +17,7 @@ export const roomRates = (r, t = r ? tenantOf(r.id) : null) => ({
   water: rateNum(t?.wRate) ?? rateNum(r?.wRate) ?? rates().water,
   elec: rateNum(t?.eRate) ?? rateNum(r?.eRate) ?? rates().elec });
 export const lineName = roomId => { const t = tenantOf(roomId); return `${roomId}-${stripTitle(t?.name)}`; };
-export const lineLinkOf = roomId => db.all('lineLinks').find(l => l.room === roomId && l.active !== false) || null;
+export const lineLinkOf = roomId => db.all('lineLinks').find(l => String(l.room) === String(roomId) && l.active !== false) || null;
 export const langOf = b => (b.lang || db.get('tenants', b.tenantId)?.lang || tenantOf(b.room)?.lang || 'th');
 
 export const billId = (period, room) => `${period}-${room}`;
